@@ -9,7 +9,6 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 app = FastAPI(title="Calculadora Pro API", version="1.0.0")
 
-
 # ---------------------------
 # Safe expression evaluation
 # ---------------------------
@@ -54,7 +53,6 @@ _ALLOWED_CONSTS = {
     "tau": math.tau,
 }
 
-
 class SafeEvalError(ValueError):
     pass
 
@@ -93,7 +91,7 @@ def safe_eval(expr: str, variables: Optional[Dict[str, float]] = None) -> float:
                 return float(variables[node.id])
             if node.id in _ALLOWED_CONSTS:
                 return float(_ALLOWED_CONSTS[node.id])
-            raise SafeEvalError(f"Identificador no permitido: {node.id}")
+            raise SafeEvalError(f"¡ERROR!: {node.id}")
 
         if isinstance(node, ast.UnaryOp) and type(node.op) in _ALLOWED_UNARYOPS:
             return _ALLOWED_UNARYOPS[type(node.op)](_eval(node.operand))
@@ -224,7 +222,7 @@ def calculate(req: CalcRequest):
         if op == "bit_not":
             return {"result": ~n}
 
-        return {"error": "Operación de programador inválida"}
+        return {"error": "Operación inválida"}
 
     if mode == "date":
         op = (req.date_op or "").strip().lower()
@@ -232,7 +230,7 @@ def calculate(req: CalcRequest):
             d1 = datetime.strptime(req.date1, "%Y-%m-%d").date() if req.date1 else None
             d2 = datetime.strptime(req.date2, "%Y-%m-%d").date() if req.date2 else None
         except Exception:
-            return {"error": "Formato de fecha inválido (usá YYYY-MM-DD)"}
+            return {"error": "Formato inválido (usá YYYY-MM-DD)"}
 
         if op == "diff":
             if not d1 or not d2:
@@ -246,7 +244,7 @@ def calculate(req: CalcRequest):
             out = d1 + delta if op == "add" else d1 - delta
             return {"result": out.isoformat()}
 
-        return {"error": "Operación de fechas inválida (diff/add/sub)"}
+        return {"error": "Operación inválida (diff/add/sub)"}
 
     return {"error": "Modo inválido"}
 
