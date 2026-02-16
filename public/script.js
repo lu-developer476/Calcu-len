@@ -1,6 +1,9 @@
 const $ = (id) => document.getElementById(id);
 
 const tabs = Array.from(document.querySelectorAll(".tab"));
+const sidebar = document.querySelector(".sidebar");
+const menuToggle = $("menuToggle");
+
 const panels = {
   standard: $("panel-expression"),
   scientific: $("panel-expression"),
@@ -10,6 +13,10 @@ const panels = {
 };
 
 let currentMode = "standard";
+
+/* ============================= */
+/* UI Helpers */
+/* ============================= */
 
 function setStatus(msg) {
   $("status").innerText = msg;
@@ -27,30 +34,14 @@ function setTitle(mode) {
 }
 
 function showPanel(mode) {
-  // hide all first
-  $("panel-expression").classList.add("hidden");
-  $("panel-graph").classList.add("hidden");
-  $("panel-programmer").classList.add("hidden");
-  $("panel-date").classList.add("hidden");
+  Object.values(panels).forEach(p => p?.classList.add("hidden"));
 
   if (mode === "standard" || mode === "scientific") {
     $("panel-expression").classList.remove("hidden");
   } else {
-    panels[mode].classList.remove("hidden");
+    panels[mode]?.classList.remove("hidden");
   }
 }
-
-tabs.forEach(btn => {
-  btn.addEventListener("click", () => {
-    tabs.forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentMode = btn.dataset.mode;
-    setTitle(currentMode);
-    showPanel(currentMode);
-    setStatus("Listo.");
-    clearOutputs();
-  });
-});
 
 function clearOutputs() {
   $("result").innerText = "";
@@ -58,46 +49,114 @@ function clearOutputs() {
   $("dResult").innerText = "";
 }
 
+/* ============================= */
+/* Sidebar Mobile Behavior */
+/* ============================= */
+
+if (menuToggle) {
+  menuToggle.addEventListener("click", () => {
+    sidebar.classList.toggle("open");
+  });
+}
+
+// cerrar sidebar en mobile al hacer click fuera
+document.addEventListener("click", (e) => {
+  if (window.innerWidth < 1024 &&
+      sidebar.classList.contains("open") &&
+      !sidebar.contains(e.target) &&
+      e.target !== menuToggle) {
+    sidebar.classList.remove("open");
+  }
+});
+
+/* ============================= */
+/* Tab Navigation */
+/* ============================= */
+
+tabs.forEach(btn => {
+  btn.addEventListener("click", () => {
+    tabs.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    currentMode = btn.dataset.mode;
+    setTitle(currentMode);
+    showPanel(currentMode);
+    clearOutputs();
+    setStatus("Listo.");
+
+    // cerrar sidebar en mobile después de seleccionar
+    if (window.innerWidth < 1024) {
+      sidebar.classList.remove("open");
+    }
+  });
+});
+
+/* ============================= */
+/* API Helper */
+/* ============================= */
+
 async function postJSON(url, payload) {
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+
+  if (!res.ok) {
+    throw new Error("HTTP error");
+  }
+
   return res.json();
 }
 
-// Standard / Scientific
-$("btn-calc").addEventListener("click", async () => {
-  const expr = $("expression").value.trim();
-  if (!expr) return setStatus("Escribí una expresión.");
+/* ============================= */
+/* Standard / Scientific */
+/* ============================= */
 
-  setStatus("Calculando...");
-  try {
-    const data = await postJSON("/api/calculate", {
-      mode: currentMode,
-      expression: expr,
-    });
-    if (data.error) {
-      $("result").innerText = "❌ " + data.error;
-      setStatus("Error.");
-      return;
-    }
-    $("result").innerText = "✅ " + data.result;
-    setStatus("OK.");
-  } catch (e) {
-    $("result").innerText = "❌ No se pudo conectar con la API.";
-    setStatus("Error de red.");
-  }
-});
-
-$("btn-clear").addEventListener("click", () => {
+$("btn-calc")?.addEventListener("click", calculateExpression);
+$("btn-clear")?.addEventListener("click", () => {
   $("expression").value = "";
   $("result").innerText = "";
   setStatus("Listo.");
 });
 
-// Graph
+// Enter para calcular
+$("expression")?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    calculateExpression();
+  }
+});
+
+async function calculateExpression() {
+  const expr = $("expression").value.trim();
+  if (!expr) return setStatus("Escribí una expresión.");
+
+  setStatus("Calculando...");
+
+  try {
+    const data = await postJSON("/api/calculate", {
+      mode: currentMode,
+      expression: expr,
+    });
+
+    if (data.error) {
+      $("result").innerText = "❌ " + data.error;
+      return setStatus("Error.");
+    }
+
+    $("result").innerText = "✅ " + data.result;
+    setStatus("OK.");
+
+  } catch {
+    $("result").innerText = "❌ No se pudo conectar con la API.";
+    setStatus("Error de red.");
+  }
+}
+
+/* ============================= */
+/* Graph */
+/* ============================= */
+
 let chart = null;
 
 function destroyChart() {
@@ -107,7 +166,7 @@ function destroyChart() {
   }
 }
 
-$("btn-plot").addEventListener("click", async () => {
+$("btn-plot")?.addEventListener("click", async () => {
   const expr = $("graphExpression").value.trim();
   if (!expr) return setStatus("Escribí una función f(x).");
 
@@ -116,36 +175,31 @@ $("btn-plot").addEventListener("click", async () => {
   const samples = parseInt($("samples").value, 10);
 
   setStatus("Generando gráfico...");
+
   try {
     const data = await postJSON("/api/graph", { expression: expr, x_min, x_max, samples });
-    if (data.error) {
-      setStatus("Error.");
-      return;
-    }
 
-    const xs = data.x;
-    const ys = data.y;
+    if (data.error) return setStatus("Error.");
 
     destroyChart();
+
     const ctx = $("chart").getContext("2d");
 
-    // Chart.js wants labels + data
     chart = new Chart(ctx, {
       type: "line",
       data: {
-        labels: xs,
-        datasets: [
-          {
-            label: `f(x) = ${expr}`,
-            data: ys,
-            spanGaps: false,
-            pointRadius: 0,
-            borderWidth: 2
-          }
-        ]
+        labels: data.x,
+        datasets: [{
+          label: `f(x) = ${expr}`,
+          data: data.y,
+          spanGaps: false,
+          pointRadius: 0,
+          borderWidth: 2
+        }]
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         scales: {
           x: { ticks: { maxTicksLimit: 10 } }
         }
@@ -153,23 +207,28 @@ $("btn-plot").addEventListener("click", async () => {
     });
 
     setStatus("OK.");
-  } catch (e) {
+
+  } catch {
     setStatus("Error de red.");
   }
 });
 
-$("btn-plot-clear").addEventListener("click", () => {
+$("btn-plot-clear")?.addEventListener("click", () => {
   $("graphExpression").value = "";
   destroyChart();
   setStatus("Listo.");
 });
 
-// Programmer
-$("btn-to-base").addEventListener("click", async () => {
+/* ============================= */
+/* Programmer */
+/* ============================= */
+
+$("btn-to-base")?.addEventListener("click", async () => {
   const number = parseInt($("pNumber").value, 10);
   const base = parseInt($("pBase").value, 10);
 
   setStatus("Convirtiendo...");
+
   try {
     const data = await postJSON("/api/calculate", {
       mode: "programmer",
@@ -177,56 +236,63 @@ $("btn-to-base").addEventListener("click", async () => {
       number,
       base
     });
+
     $("pResult").innerText = data.error ? "❌ " + data.error : "✅ " + data.result;
     setStatus(data.error ? "Error." : "OK.");
-  } catch (e) {
+
+  } catch {
     $("pResult").innerText = "❌ No se pudo conectar con la API.";
     setStatus("Error de red.");
   }
 });
 
-$("btn-bitwise").addEventListener("click", async () => {
+$("btn-bitwise")?.addEventListener("click", async () => {
   const number = parseInt($("pNumber").value, 10);
   const op = $("pOp").value;
   const other = parseInt($("pOther").value, 10);
 
   setStatus("Calculando...");
+
   const payload = { mode: "programmer", op, number };
   if (!Number.isNaN(other) && op !== "bit_not") payload.other = other;
 
   try {
     const data = await postJSON("/api/calculate", payload);
+
     $("pResult").innerText = data.error ? "❌ " + data.error : "✅ " + data.result;
     setStatus(data.error ? "Error." : "OK.");
-  } catch (e) {
+
+  } catch {
     $("pResult").innerText = "❌ No se pudo conectar con la API.";
     setStatus("Error de red.");
   }
 });
 
-$("btn-prog-clear").addEventListener("click", () => {
+$("btn-prog-clear")?.addEventListener("click", () => {
   $("pResult").innerText = "";
   setStatus("Listo.");
 });
 
-// Date
+/* ============================= */
+/* Date */
+/* ============================= */
+
 function todayISO() {
   const d = new Date();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
+  return d.toISOString().split("T")[0];
 }
 
 $("d1").value = todayISO();
 $("d2").value = todayISO();
 
-$("btn-date").addEventListener("click", async () => {
+$("btn-date")?.addEventListener("click", async () => {
   const date1 = $("d1").value;
   const date2 = $("d2").value;
   const days = parseInt($("days").value, 10);
   const date_op = $("dOp").value;
 
   setStatus("Calculando...");
+
   try {
     const data = await postJSON("/api/calculate", {
       mode: "date",
@@ -235,15 +301,17 @@ $("btn-date").addEventListener("click", async () => {
       date2,
       days: Number.isNaN(days) ? null : days
     });
+
     $("dResult").innerText = data.error ? "❌ " + data.error : "✅ " + data.result;
     setStatus(data.error ? "Error." : "OK.");
-  } catch (e) {
+
+  } catch {
     $("dResult").innerText = "❌ No se pudo conectar con la API.";
     setStatus("Error de red.");
   }
 });
 
-$("btn-date-clear").addEventListener("click", () => {
+$("btn-date-clear")?.addEventListener("click", () => {
   $("dResult").innerText = "";
   setStatus("Listo.");
 });
