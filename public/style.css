@@ -31,7 +31,7 @@ body{
   min-height:100vh;
 }
 
-/* Sidebar como drawer en mobile */
+/* Sidebar drawer mobile */
 .sidebar{
   position:fixed;
   left:-100%;
@@ -52,7 +52,6 @@ body{
 .brand{
   font-weight:800;
   font-size:18px;
-  letter-spacing:.2px;
   margin-bottom:14px;
 }
 
@@ -94,7 +93,6 @@ body{
   background: rgba(15,23,42,.35);
 }
 
-/* Tips Accordion */
 .tips-toggle{
   width:100%;
   padding:8px;
@@ -110,11 +108,9 @@ body{
   display:none;
 }
 
-.hint ul{ margin:0; padding-left:18px; }
-.hint li{ margin:6px 0; }
-.hint code{ color:#c7d2fe; }
-
-/* Main */
+/* ============================= */
+/* MAIN */
+/* ============================= */
 
 .main{
   padding:16px;
@@ -122,20 +118,23 @@ body{
 
 .header{
   display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:6px;
   margin-bottom:16px;
 }
 
 .header h1{
   margin:0;
-  font-size:clamp(22px, 4vw, 28px);
+  font-size:clamp(20px, 5vw, 28px);
+  line-height:1.2;
+  word-break:keep-all;
 }
 
 .status{
+  align-self:flex-end;
+  font-size:11px;
   color:var(--muted);
-  font-size:10px;
 }
 
 .panel{
@@ -151,19 +150,20 @@ body{
 .label{
   display:block;
   color:var(--muted);
-  font-size:13px;
+  font-size:12px;
   margin:6px 0 8px;
 }
 
 .input{
   width:100%;
-  padding:12px;
+  padding:10px;
   border-radius:12px;
   border:1px solid var(--border);
   background: rgba(15,23,42,.55);
   color:var(--text);
   outline:none;
 }
+
 .input:focus{
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(96,165,250,.12);
@@ -171,12 +171,13 @@ body{
 
 .row{
   display:flex;
+  flex-direction:column;
   gap:10px;
   margin-top:12px;
-  flex-wrap:wrap;
 }
 
 .btn{
+  width:100%;
   padding:10px 12px;
   border-radius:12px;
   border:1px solid var(--border);
@@ -184,7 +185,9 @@ body{
   color:var(--text);
   cursor:pointer;
 }
+
 .btn:hover{ border-color:#334155; }
+
 .btn.primary{
   border-color: rgba(96,165,250,.55);
   background: rgba(96,165,250,.16);
@@ -222,7 +225,6 @@ body{
   background: rgba(15,23,42,.35);
 }
 
-/* Botón menú */
 .menu-toggle{
   display:block;
   padding:8px 12px;
@@ -233,19 +235,6 @@ body{
   cursor:pointer;
 }
 
-/* MEDIA QUERY*/
-/* ============================= */
-/* CELULARES ≥ 600px */
-/* ============================= */
-
-@media (min-width:600px){
-
-  .grid2{
-    grid-template-columns:1fr 1fr;
-  }
-
-}
-
 /* ============================= */
 /* TABLET ≥ 768px */
 /* ============================= */
@@ -254,6 +243,14 @@ body{
 
   .grid2{
     grid-template-columns:1fr 1fr;
+  }
+
+  .row{
+    flex-direction:row;
+  }
+
+  .btn{
+    width:auto;
   }
 
 }
@@ -279,6 +276,15 @@ body{
     display:none;
   }
 
+  .header{
+    flex-direction:row;
+    align-items:center;
+  }
+
+  .status{
+    align-self:auto;
+  }
+
 }
 
 /* ============================= */
@@ -293,13 +299,18 @@ body{
 
 }
 
+/* ============================= */
+/* TIP TEXT */
+/* ============================= */
+
 .tip-text{
   min-height:60px;
   display:flex;
   align-items:center;
-  padding:8px;
+  padding:10px;
   border-radius:8px;
   background: rgba(15,23,42,.4);
   border:1px solid var(--border);
-  font-size:7px;
+  font-size:12px;
+  line-height:1.4;
 }
