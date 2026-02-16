@@ -117,22 +117,25 @@ def safe_eval(expr: str, variables: Optional[Dict[str, float]] = None) -> float:
 
         if isinstance(node, ast.Call):
 
-            # -------------------------
             # DERIVADA
-            # -------------------------
             if isinstance(node.func, ast.Name) and node.func.id == "der":
-                if len(node.args) != 1:
-                    raise SafeEvalError("der requiere 1 argumento")
 
-                expr_source = ast.unparse(node.args[0])
-                x_value = variables.get("x", 0.0)
+                if len(node.args) == 1:
+                    expr_source = ast.unparse(node.args[0])
+                    x_value = variables.get("x", 0.0)
+
+                elif len(node.args) == 2:
+                    expr_source = ast.unparse(node.args[0])
+                    x_value = _eval(node.args[1])
+
+                else:
+                    raise SafeEvalError("der requiere 1 o 2 argumentos: der(expr, x)")
 
                 return numerical_derivative(expr_source, x_value)
 
-            # -------------------------
             # INTEGRAL DEFINIDA
-            # -------------------------
             if isinstance(node.func, ast.Name) and node.func.id == "int":
+
                 if len(node.args) != 3:
                     raise SafeEvalError("int requiere 3 argumentos: int(expr, a, b)")
 
@@ -142,10 +145,9 @@ def safe_eval(expr: str, variables: Optional[Dict[str, float]] = None) -> float:
 
                 return numerical_integral(expr_source, a, b)
 
-            # -------------------------
             # FUNCIONES NORMALES
-            # -------------------------
             if isinstance(node.func, ast.Name) and node.func.id in _ALLOWED_FUNCS:
+
                 fn = _ALLOWED_FUNCS[node.func.id]
                 args = [_eval(a) for a in node.args]
 
@@ -180,13 +182,11 @@ class CalcRequest(BaseModel):
     days: Optional[int] = None    # for add/sub
     date_op: Optional[str] = None # diff | add | sub
 
-
 class GraphRequest(BaseModel):
     expressions: List[str] = Field(..., description="Lista de funciones en x, ej: sin(x) + x**2")
     x_min: float = -10
     x_max: float = 10
     samples: int = 200
-
 
 # ---------------------------
 # Routes
