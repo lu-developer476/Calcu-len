@@ -18,16 +18,32 @@ body{
   color:var(--text);
 }
 
+/* ============================= */
+/* MOBILE FIRST */
+/* ============================= */
+
 .app{
-  display:grid;
-  grid-template-columns: 280px 1fr;
+  display:flex;
+  flex-direction:column;
   min-height:100vh;
 }
 
+/* Sidebar como drawer en mobile */
 .sidebar{
-  border-right:1px solid var(--border);
+  position:fixed;
+  left:-100%;
+  top:0;
+  width:260px;
+  height:100%;
   padding:18px;
-  background: linear-gradient(180deg, rgba(17,24,39,.9), rgba(11,15,20,.9));
+  border-right:1px solid var(--border);
+  background: linear-gradient(180deg, rgba(17,24,39,.95), rgba(11,15,20,.95));
+  transition:left .3s ease;
+  z-index:1000;
+}
+
+.sidebar.open{
+  left:0;
 }
 
 .brand{
@@ -42,7 +58,7 @@ body{
   display:flex;
   align-items:center;
   gap:10px;
-  padding:12px 12px;
+  padding:12px;
   margin:8px 0;
   border:1px solid var(--border);
   background: rgba(15,23,42,.6);
@@ -74,18 +90,36 @@ body{
   color:var(--muted);
   background: rgba(15,23,42,.35);
 }
-.hint-title{ color:var(--text); font-weight:700; margin-bottom:8px; }
+
+/* Tips Accordion */
+.tips-toggle{
+  width:100%;
+  padding:8px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background: rgba(15,23,42,.55);
+  color:var(--text);
+  cursor:pointer;
+  margin-bottom:8px;
+}
+
+.tips-content.hidden{
+  display:none;
+}
+
 .hint ul{ margin:0; padding-left:18px; }
 .hint li{ margin:6px 0; }
-.hint code{ color: #c7d2fe; }
+.hint code{ color:#c7d2fe; }
+
+/* Main */
 
 .main{
-  padding:22px 22px 28px;
+  padding:16px;
 }
 
 .header{
   display:flex;
-  align-items:flex-end;
+  align-items:center;
   justify-content:space-between;
   gap:12px;
   margin-bottom:16px;
@@ -93,8 +127,7 @@ body{
 
 .header h1{
   margin:0;
-  font-size:28px;
-  letter-spacing:.2px;
+  font-size:clamp(22px, 4vw, 28px);
 }
 
 .status{
@@ -107,7 +140,7 @@ body{
   background: rgba(17,24,39,.65);
   border-radius:16px;
   padding:16px;
-  max-width: 920px;
+  max-width:100%;
 }
 
 .hidden{ display:none; }
@@ -121,7 +154,7 @@ body{
 
 .input{
   width:100%;
-  padding:12px 12px;
+  padding:12px;
   border-radius:12px;
   border:1px solid var(--border);
   background: rgba(15,23,42,.55);
@@ -160,16 +193,15 @@ body{
   border-radius:12px;
   background: rgba(15,23,42,.35);
   border:1px solid var(--border);
-  min-height: 44px;
+  min-height:44px;
   display:flex;
   align-items:center;
-  color: var(--text);
   overflow:auto;
 }
 
 .grid2{
   display:grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns:1fr;
   gap:12px;
 }
 
@@ -187,8 +219,60 @@ body{
   background: rgba(15,23,42,.35);
 }
 
-@media (max-width: 900px){
-  .app{ grid-template-columns: 1fr; }
-  .sidebar{ position:sticky; top:0; z-index:2; }
-  .grid2{ grid-template-columns: 1fr; }
+/* Botón menú */
+.menu-toggle{
+  display:block;
+  padding:8px 12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background: rgba(15,23,42,.55);
+  color:var(--text);
+  cursor:pointer;
+}
+
+/* ============================= */
+/* TABLET ≥ 768px */
+/* ============================= */
+
+@media (min-width:768px){
+
+  .grid2{
+    grid-template-columns:1fr 1fr;
+  }
+
+}
+
+/* ============================= */
+/* DESKTOP ≥ 1024px */
+/* ============================= */
+
+@media (min-width:1024px){
+
+  .app{
+    display:grid;
+    grid-template-columns:280px 1fr;
+  }
+
+  .sidebar{
+    position:relative;
+    left:0;
+    height:auto;
+  }
+
+  .menu-toggle{
+    display:none;
+  }
+
+}
+
+/* ============================= */
+/* DESKTOP GRANDE ≥ 1440px */
+/* ============================= */
+
+@media (min-width:1440px){
+
+  .main{
+    padding:32px 64px;
+  }
+
 }
