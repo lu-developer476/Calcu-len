@@ -1,3 +1,6 @@
+import re
+import cmath
+
 from __future__ import annotations
 
 from fastapi import FastAPI
@@ -32,41 +35,51 @@ ANGLE_MODE = "RAD"  # "RAD" o "DEG"
 
 _ALLOWED_FUNCS = {
     # scientific
-    "sqrt": math.sqrt,
-    "sin": lambda x: math.sin(math.radians(x)) if ANGLE_MODE == "DEG" else math.sin(x),
-    "cos": lambda x: math.cos(math.radians(x)) if ANGLE_MODE == "DEG" else math.cos(x),
-    "tan": lambda x: math.tan(math.radians(x)) if ANGLE_MODE == "DEG" else math.tan(x),
-    "asin": math.asin,
-    "acos": math.acos,
-    "atan": math.atan,
-    "log": math.log10,
-    "ln": math.log,
+    "sqrt": cmath.sqrt,
+    "sin": lambda x: cmath.sin(math.radians(x)) if ANGLE_MODE == "DEG" else cmath.sin(x),
+    "cos": lambda x: cmath.cos(math.radians(x)) if ANGLE_MODE == "DEG" else cmath.cos(x),
+    "tan": lambda x: cmath.tan(math.radians(x)) if ANGLE_MODE == "DEG" else cmath.tan(x),
+    "asin": lambda x: math.degrees(cmath.asin(x)) if ANGLE_MODE == "DEG" else cmath.asin(x),
+    "acos": lambda x: math.degrees(cmath.acos(x)) if ANGLE_MODE == "DEG" else cmath.acos(x),
+    "atan": lambda x: math.degrees(cmath.atan(x)) if ANGLE_MODE == "DEG" else cmath.atan(x),
+    "log": cmath.log10,
+    "ln": cmath.log,
+    "exp": cmath.exp,
     "abs": abs,
-    "floor": math.floor,
-    "ceil": math.ceil,
+    "floor": lambda x: math.floor(x.real) if isinstance(x, complex) else math.floor(x),
+    "ceil": lambda x: math.ceil(x.real) if isinstance(x, complex) else math.ceil(x),
     "round": round,
     "fact": math.factorial,
     "factorial": math.factorial,
-    "exp": math.exp,
+
+    # hyperbolic
+    "sinh": math.sinh,
+    "cosh": math.cosh,
+    "tanh": math.tanh,
+    "asinh": math.asinh,
+    "acosh": math.acosh,
+    "atanh": math.atanh,
+
 }
 
 _ALLOWED_CONSTS = {
     "pi": math.pi,
     "e": math.e,
     "tau": math.tau,
+    "j": 1j,        # 👈 unidad imaginaria
 }
 
 class SafeEvalError(ValueError):
     pass
 
-def _to_number(x: Any) -> float:
-    if isinstance(x, (int, float)):
-        return float(x)
+def _to_number(x: Any) -> Union[float, complex]:
+    if isinstance(x, (int, float, complex)):
+        return x
     raise SafeEvalError("Número inválido")
 
-def numerical_integral(expr: str, a: float, b: float, n: int = 1000) -> float:
+def numerical_integral(expr: str, a: float, b: float, n: int = 1000) -> Union[float, complex]:
     step = (b - a) / n
-    total = 0.0
+    total = 0
 
     for i in range(n + 1):
         x = a + i * step
@@ -77,43 +90,65 @@ def numerical_integral(expr: str, a: float, b: float, n: int = 1000) -> float:
 
     return total * step
 
-def numerical_derivative(expr: str, x: float, h: float = 1e-5) -> float:
+def numerical_derivative(expr: str, x: float, h: float = 1e-5) -> Union[float, complex]:
     return (
         safe_eval(expr, {"x": x + h}) -
         safe_eval(expr, {"x": x - h})
     ) / (2 * h)
 
-def format_result(value: float) -> Union[float, str]:
-    if value == 0:
-        return 0
-    if abs(value) >= 1e6 or abs(value) <= 1e-6:
-        return f"{value:.6e}"
-    return value
+def format_result(value: Union[float, complex]) -> str:
 
-def safe_eval(expr: str, variables: Optional[Dict[str, float]] = None) -> float:
+    if isinstance(value, complex):
+
+        real = round(value.real, 5)
+        imag = round(value.imag, 5)
+
+        # Si parte imaginaria es prácticamente 0 → número real
+        if abs(imag) < 1e-12:
+            return f"{real:.5f}"
+
+        # Si parte real es prácticamente 0 → solo imaginario
+        if abs(real) < 1e-12:
+            return f"{imag:.5f}i"
+
+        sign = "+" if imag >= 0 else "-"
+        return f"{real:.5f} {sign} {abs(imag):.5f}i"
+
+    value = round(value, 5)
+
+    if abs(value) >= 1e6:
+        return f"{value:.5e}"
+
+    return f"{value:.5f}"
+
+def safe_eval(expr: str, variables: Optional[Dict[str, Union[float, complex]]] = None) -> Union[float, complex]:
+
     if variables is None:
         variables = {}
+
+    # Permitir uso de "i" como imaginario
+    expr = re.sub(r'(?<![a-zA-Z])i(?![a-zA-Z])', 'j', expr)
 
     try:
         tree = ast.parse(expr, mode="eval")
     except SyntaxError as e:
         raise SafeEvalError("Expresión inválida") from e
 
-    def _eval(node: ast.AST) -> float:
+    def _eval(node: ast.AST) -> Union[float, complex]:
 
         if isinstance(node, ast.Expression):
             return _eval(node.body)
 
         if isinstance(node, ast.Constant):
-            if isinstance(node.value, (int, float)):
-                return float(node.value)
+            if isinstance(node.value, (int, float, complex)):
+                return node.value
             raise SafeEvalError("Solo números permitidos")
 
         if isinstance(node, ast.Name):
             if node.id in variables:
-                return float(variables[node.id])
+                return variables[node.id]
             if node.id in _ALLOWED_CONSTS:
-                return float(_ALLOWED_CONSTS[node.id])
+                return _ALLOWED_CONSTS[node.id]
             raise SafeEvalError(f"Variable inválida: {node.id}")
 
         if isinstance(node, ast.UnaryOp) and type(node.op) in _ALLOWED_UNARYOPS:
@@ -127,58 +162,37 @@ def safe_eval(expr: str, variables: Optional[Dict[str, float]] = None) -> float:
 
         if isinstance(node, ast.Call):
 
-            # DERIVADA
+            # Derivada
             if isinstance(node.func, ast.Name) and node.func.id == "der":
-
-                if len(node.args) == 1:
-                    expr_source = ast.unparse(node.args[0])
-                    x_value = variables.get("x", 0.0)
-
-                elif len(node.args) == 2:
-                    expr_source = ast.unparse(node.args[0])
-                    x_value = _eval(node.args[1])
-
-                else:
-                    raise SafeEvalError("der requiere 1 o 2 argumentos: der(expr, x)")
-
+                if len(node.args) != 2:
+                    raise SafeEvalError("der requiere 2 argumentos: der(expr, x)")
+                expr_source = ast.unparse(node.args[0])
+                x_value = _eval(node.args[1])
                 return numerical_derivative(expr_source, x_value)
 
-            # INTEGRAL DEFINIDA
+            # Integral
             if isinstance(node.func, ast.Name) and node.func.id == "int":
-            
-                if len(node.args) not in (3, 4):
-                    raise SafeEvalError("int requiere 3 o 4 argumentos: int(expr, a, b, n)")
-            
+                if len(node.args) != 3:
+                    raise SafeEvalError("int requiere 3 argumentos: int(expr, a, b)")
                 expr_source = ast.unparse(node.args[0])
                 a = _eval(node.args[1])
                 b = _eval(node.args[2])
-            
-                n = 1000
-                if len(node.args) == 4:
-                    n = int(_eval(node.args[3]))
-                    if n < 10 or n > 100000:
-                        raise SafeEvalError("n debe estar entre 10 y 100000")
-            
-                return numerical_integral(expr_source, a, b, n)
+                return numerical_integral(expr_source, a, b)
 
-            # FUNCIONES NORMALES
+            # Funciones matemáticas
             if isinstance(node.func, ast.Name) and node.func.id in _ALLOWED_FUNCS:
-
                 fn = _ALLOWED_FUNCS[node.func.id]
                 args = [_eval(a) for a in node.args]
-
-                if fn in (math.factorial,) and (
-                    len(args) != 1 or args[0] < 0 or int(args[0]) != args[0]
-                ):
-                    raise SafeEvalError("factorial requiere entero >= 0")
-
-                return float(fn(*args))
+                try:
+                    return fn(*args)
+                except Exception:
+                    raise SafeEvalError("Error en función matemática")
 
             raise SafeEvalError("Función no permitida")
 
         raise SafeEvalError("Operación no permitida")
 
-    return float(_eval(tree))
+    return _eval(tree)
 
 # ---------------------------
 # Models
@@ -342,10 +356,10 @@ def graph(req: GraphRequest):
         for x in xs:
             try:
                 y = safe_eval(expr, variables={"x": x})
-                if abs(y) > 1e12:
-                    ys.append(None)
-                else:
-                    ys.append(y)
+                if isinstance(y, complex):
+                    y = y.real
+                    
+                ys.append(y)
             except Exception:
                 ys.append(None)
 
