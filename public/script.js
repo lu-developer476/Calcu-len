@@ -61,7 +61,7 @@ if (menuToggle) {
 
 // cerrar sidebar en mobile al hacer click fuera
 document.addEventListener("click", (e) => {
-  if (window.innerWidth < 1024 &&
+  if (window.innerWidth < 1240 &&
       sidebar.classList.contains("open") &&
       !sidebar.contains(e.target) &&
       e.target !== menuToggle) {
@@ -82,10 +82,10 @@ tabs.forEach(btn => {
     setTitle(currentMode);
     showPanel(currentMode);
     clearOutputs();
-    setStatus("Listo.");
+    setStatus("© Todos los derechos reservados | Realizado por Lucas Leonel Montenegro Burgos");
 
     // cerrar sidebar en mobile después de seleccionar
-    if (window.innerWidth < 1024) {
+    if (window.innerWidth < 1240) {
       sidebar.classList.remove("open");
     }
   });
@@ -117,7 +117,7 @@ $("btn-calc")?.addEventListener("click", calculateExpression);
 $("btn-clear")?.addEventListener("click", () => {
   $("expression").value = "";
   $("result").innerText = "";
-  setStatus("Listo.");
+  setStatus("© Todos los derechos reservados | Realizado por Lucas Leonel Montenegro Burgos");
 });
 
 // Enter para calcular
@@ -131,7 +131,7 @@ async function calculateExpression() {
   const expr = $("expression").value.trim();
   if (!expr) return setStatus("Escribí una expresión.");
 
-  setStatus("Calculando...");
+  setStatus("Realizando cálculo...");
 
   try {
     const data = await postJSON("/api/calculate", {
@@ -145,7 +145,7 @@ async function calculateExpression() {
     }
 
     $("result").innerText = "✅ " + data.result;
-    setStatus("OK.");
+    setStatus("HECHO.");
 
   } catch {
     $("result").innerText = "❌ No se pudo conectar con la API.";
@@ -206,7 +206,7 @@ $("btn-plot")?.addEventListener("click", async () => {
       }
     });
 
-    setStatus("OK.");
+    setStatus("HECHO.");
 
   } catch {
     setStatus("Error de red.");
@@ -216,7 +216,7 @@ $("btn-plot")?.addEventListener("click", async () => {
 $("btn-plot-clear")?.addEventListener("click", () => {
   $("graphExpression").value = "";
   destroyChart();
-  setStatus("Listo.");
+  setStatus("© Todos los derechos reservados | Realizado por Lucas Leonel Montenegro Burgos");
 });
 
 /* ============================= */
@@ -238,7 +238,7 @@ $("btn-to-base")?.addEventListener("click", async () => {
     });
 
     $("pResult").innerText = data.error ? "❌ " + data.error : "✅ " + data.result;
-    setStatus(data.error ? "Error." : "OK.");
+    setStatus(data.error ? "Error." : "HECHO.");
 
   } catch {
     $("pResult").innerText = "❌ No se pudo conectar con la API.";
@@ -251,7 +251,7 @@ $("btn-bitwise")?.addEventListener("click", async () => {
   const op = $("pOp").value;
   const other = parseInt($("pOther").value, 10);
 
-  setStatus("Calculando...");
+  setStatus("Realizando cálculo...");
 
   const payload = { mode: "programmer", op, number };
   if (!Number.isNaN(other) && op !== "bit_not") payload.other = other;
@@ -260,7 +260,7 @@ $("btn-bitwise")?.addEventListener("click", async () => {
     const data = await postJSON("/api/calculate", payload);
 
     $("pResult").innerText = data.error ? "❌ " + data.error : "✅ " + data.result;
-    setStatus(data.error ? "Error." : "OK.");
+    setStatus(data.error ? "Error." : "HECHO.");
 
   } catch {
     $("pResult").innerText = "❌ No se pudo conectar con la API.";
@@ -270,7 +270,7 @@ $("btn-bitwise")?.addEventListener("click", async () => {
 
 $("btn-prog-clear")?.addEventListener("click", () => {
   $("pResult").innerText = "";
-  setStatus("Listo.");
+  setStatus("© Todos los derechos reservados | Realizado por Lucas Leonel Montenegro Burgos");
 });
 
 /* ============================= */
@@ -291,7 +291,7 @@ $("btn-date")?.addEventListener("click", async () => {
   const days = parseInt($("days").value, 10);
   const date_op = $("dOp").value;
 
-  setStatus("Calculando...");
+  setStatus("Realizando cálculo...");
 
   try {
     const data = await postJSON("/api/calculate", {
@@ -303,7 +303,7 @@ $("btn-date")?.addEventListener("click", async () => {
     });
 
     $("dResult").innerText = data.error ? "❌ " + data.error : "✅ " + data.result;
-    setStatus(data.error ? "Error." : "OK.");
+    setStatus(data.error ? "Error." : "HECHO.");
 
   } catch {
     $("dResult").innerText = "❌ No se pudo conectar con la API.";
@@ -313,7 +313,7 @@ $("btn-date")?.addEventListener("click", async () => {
 
 $("btn-date-clear")?.addEventListener("click", () => {
   $("dResult").innerText = "";
-  setStatus("Listo.");
+  setStatus("© Todos los derechos reservados | Realizado por Lucas Leonel Montenegro Burgos");
 });
 
 /* ============================= */
