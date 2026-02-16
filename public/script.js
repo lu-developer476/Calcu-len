@@ -167,8 +167,11 @@ function destroyChart() {
 }
 
 $("btn-plot")?.addEventListener("click", async () => {
-  const expr = $("graphExpression").value.trim();
-  if (!expr) return setStatus("Escribí una función f(x).");
+
+  const rawInput = $("graphExpression").value.trim();
+  if (!rawInput) return setStatus("Escribí una función.");
+
+  const expressions = rawInput.split(",").map(e => e.trim());
 
   const x_min = parseFloat($("xmin").value);
   const x_max = parseFloat($("xmax").value);
@@ -177,7 +180,13 @@ $("btn-plot")?.addEventListener("click", async () => {
   setStatus("Generando gráfico...");
 
   try {
-    const data = await postJSON("/api/graph", { expression: expr, x_min, x_max, samples });
+
+    const data = await postJSON("/api/graph", {
+      expressions,
+      x_min,
+      x_max,
+      samples
+    });
 
     if (data.error) return setStatus("Error.");
 
@@ -185,23 +194,67 @@ $("btn-plot")?.addEventListener("click", async () => {
 
     const ctx = $("chart").getContext("2d");
 
+    const datasets = [];
+
+    data.datasets.forEach((set, index) => {
+
+      const points = set.x.map((xVal, i) => ({
+        x: xVal,
+        y: set.y[i]
+      }));
+
+      const isIntegral = set.expression.startsWith("int(");
+
+      datasets.push({
+        label: set.expression,
+        data: points,
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.2,
+        fill: false
+      });
+
+      // Si es integral, sombrear área
+      if (isIntegral) {
+
+        const match = set.expression.match(/int\((.*?),(.*?),(.*?)\)/);
+
+        if (match) {
+          const exprBase = match[1].trim();
+          const a = parseFloat(match[2]);
+          const b = parseFloat(match[3]);
+
+          const areaPoints = points.filter(p => p.x >= a && p.x <= b);
+
+          datasets.push({
+            label: `Área ∫ ${exprBase}`,
+            data: areaPoints,
+            borderWidth: 0,
+            pointRadius: 0,
+            fill: true,
+            backgroundColor: "rgba(96,165,250,0.25)"
+          });
+        }
+      }
+
+    });
+
     chart = new Chart(ctx, {
       type: "line",
-      data: {
-        labels: data.x,
-        datasets: [{
-          label: `f(x) = ${expr}`,
-          data: data.y,
-          spanGaps: false,
-          pointRadius: 0,
-          borderWidth: 2
-        }]
-      },
+      data: { datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        parsing: false,
         scales: {
-          x: { ticks: { maxTicksLimit: 10 } }
+          x: {
+            type: "linear",
+            min: x_min,
+            max: x_max
+          },
+          y: {
+            type: "linear"
+          }
         }
       }
     });
