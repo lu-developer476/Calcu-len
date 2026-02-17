@@ -1,8 +1,7 @@
-import re
-import cmath
-
 from __future__ import annotations
 
+import re
+import cmath
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from datetime import date, datetime, timedelta
