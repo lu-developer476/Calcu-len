@@ -81,7 +81,7 @@ def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-ANGLE_MODE = "DEG"
+ANGLE_MODE = "RAD"
 
 _ALLOWED_BINOPS = {
     ast.Add: lambda a, b: a + b,
