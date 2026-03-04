@@ -142,7 +142,6 @@ def _normalize_expression(expr: str) -> str:
     normalized = normalized.replace("−", "-")
     normalized = normalized.replace("√", "sqrt")
     normalized = normalized.replace("π", "pi")
-    normalized = re.sub(r"(?<=\d),(?=\d)", ".", normalized)
     return normalized
 
 
@@ -480,3 +479,4 @@ def graph(req: GraphRequest, request: Request):
         datasets.append({"expression": expr, "x": xs, "y": ys})
 
     return {"datasets": datasets}
+
