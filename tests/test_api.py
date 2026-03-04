@@ -51,3 +51,29 @@ def test_graph_rejects_invalid_window():
     response = client.post("/api/graph", json=payload)
 
     assert response.status_code == 422
+
+
+def test_scientific_defaults_to_degrees():
+    response = client.post(
+        "/api/calculate", json={"mode": "scientific", "expression": "sin(90)"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"] == "1.00000"
+
+
+def test_can_switch_angle_mode_to_radians():
+    switch = client.post("/api/angle-mode", params={"mode": "RAD"})
+    assert switch.status_code == 200
+    assert switch.json()["mode"] == "RAD"
+
+    response = client.post(
+        "/api/calculate", json={"mode": "scientific", "expression": "sin(pi/2)"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"] == "1.00000"
+
+    restore = client.post("/api/angle-mode", params={"mode": "DEG"})
+    assert restore.status_code == 200
+    assert restore.json()["mode"] == "DEG"
