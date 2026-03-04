@@ -250,21 +250,39 @@ function toLocalMathExpression(expr) {
     .replace(/\bceil\s*\(/g, "Math.ceil(")
     .replace(/\bround\s*\(/g, "Math.round(")
     .replace(/\bexp\s*\(/g, "Math.exp(")
-    .replace(/\bsin\s*\(/g, "Math.sin(")
-    .replace(/\bcos\s*\(/g, "Math.cos(")
-    .replace(/\btan\s*\(/g, "Math.tan(")
-    .replace(/\basin\s*\(/g, "Math.asin(")
-    .replace(/\bacos\s*\(/g, "Math.acos(")
-    .replace(/\batan\s*\(/g, "Math.atan(")
     .replace(/\bsinh\s*\(/g, "Math.sinh(")
     .replace(/\bcosh\s*\(/g, "Math.cosh(")
-    .replace(/\btanh\s*\(/g, "Math.tanh(");
+    .replace(/\btanh\s*\(/g, "Math.tanh(")
+    .replace(/\bsin\s*\(/g, "__sin(")
+    .replace(/\bcos\s*\(/g, "__cos(")
+    .replace(/\btan\s*\(/g, "__tan(")
+    .replace(/\basin\s*\(/g, "__asin(")
+    .replace(/\bacos\s*\(/g, "__acos(")
+    .replace(/\batan\s*\(/g, "__atan(");
 }
 
-function evalLocalExpression(expr, x = undefined) {
+function evalLocalExpression(expr, x = undefined, angleMode = "RAD") {
   const safeExpr = toLocalMathExpression(expr);
-  const fn = new Function("x", `return (${safeExpr});`);
-  const value = fn(x);
+  const useDeg = angleMode === "DEG";
+
+  const __sin = useDeg ? (v) => Math.sin((v * Math.PI) / 180) : Math.sin;
+  const __cos = useDeg ? (v) => Math.cos((v * Math.PI) / 180) : Math.cos;
+  const __tan = useDeg ? (v) => Math.tan((v * Math.PI) / 180) : Math.tan;
+  const __asin = useDeg ? (v) => (Math.asin(v) * 180) / Math.PI : Math.asin;
+  const __acos = useDeg ? (v) => (Math.acos(v) * 180) / Math.PI : Math.acos;
+  const __atan = useDeg ? (v) => (Math.atan(v) * 180) / Math.PI : Math.atan;
+
+  const fn = new Function(
+    "x",
+    "__sin",
+    "__cos",
+    "__tan",
+    "__asin",
+    "__acos",
+    "__atan",
+    `return (${safeExpr});`
+  );
+  const value = fn(x, __sin, __cos, __tan, __asin, __acos, __atan);
 
   if (!Number.isFinite(value)) {
     throw new Error("Resultado no finito");
@@ -273,13 +291,31 @@ function evalLocalExpression(expr, x = undefined) {
   return value;
 }
 
-function localFallbackCalculate(mode, expr) {
+function localFallbackCalculate(mode, expr, angleMode = "RAD") {
   if (mode !== "standard" && mode !== "scientific") {
     throw new Error("Modo no soportado en fallback local");
   }
 
-  const value = evalLocalExpression(expr);
+  const value = evalLocalExpression(expr, undefined, angleMode);
   return value.toFixed(5);
+}
+
+function localFallbackGraph(expressions, x_min, x_max, samples, angleMode = "RAD") {
+  const step = (x_max - x_min) / (samples - 1);
+  const xs = Array.from({ length: samples }, (_, i) => x_min + step * i);
+
+  return expressions.map((expression) => {
+    const ys = xs.map((x) => {
+      try {
+        const y = evalLocalExpression(expression, x, angleMode);
+        return Number.isFinite(y) ? y : null;
+      } catch {
+        return null;
+      }
+    });
+
+    return { expression, x: xs, y: ys };
+  });
 }
 
 function localFallbackProgrammer(op, number, base, other) {
@@ -364,8 +400,18 @@ async function calculateExpression() {
     setStatus("HECHO.");
 
   } catch {
-    $("result").innerText = "❌ No se pudo conectar con la API.";
-    setStatus("Error de red.");
+    try {
+      const fallback = localFallbackCalculate(
+        currentMode,
+        normalizeExpression(expr),
+        currentMode === "scientific" ? ($("angleMode")?.value || currentAngleMode) : "RAD"
+      );
+      $("result").innerText = "✅ " + fallback;
+      setStatus("API no disponible: cálculo local.");
+    } catch {
+      $("result").innerText = "❌ No se pudo conectar con la API.";
+      setStatus("Error de red.");
+    }
   } finally {
     setButtonLoading("btn-calc", false);
   }
@@ -513,9 +559,48 @@ $("btn-plot")?.addEventListener("click", async () => {
     setStatus("HECHO.");
 
   } catch {
-    graphResult.classList.remove("hidden");
-    graphResult.innerText = "❌ No se pudo conectar con la API.";
-    setStatus("Error de red.");
+    try {
+      const fallbackDatasets = localFallbackGraph(expressions, x_min, x_max, samples, currentAngleMode);
+
+      destroyChart();
+      const ctx = $("chart").getContext("2d");
+      const datasets = fallbackDatasets
+        .map((set) => ({
+          label: set.expression,
+          data: set.x
+            .map((xVal, i) => ({ x: xVal, y: set.y[i] }))
+            .filter((point) => point.y !== null && Number.isFinite(point.y)),
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.2,
+          fill: false,
+        }))
+        .filter((dataset) => dataset.data.length > 0);
+
+      if (!datasets.length) {
+        throw new Error("No se pudieron graficar puntos válidos");
+      }
+
+      chart = new Chart(ctx, {
+        type: "line",
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          parsing: false,
+          scales: {
+            x: { type: "linear", min: x_min, max: x_max },
+            y: { type: "linear" },
+          },
+        },
+      });
+
+      setStatus("API no disponible: gráfica local.");
+    } catch {
+      graphResult.classList.remove("hidden");
+      graphResult.innerText = "❌ No se pudo conectar con la API.";
+      setStatus("Error de red.");
+    }
   } finally {
     setButtonLoading("btn-plot", false);
   }
