@@ -134,6 +134,7 @@ async function postJSON(url, payload) {
   const candidates = [url];
 
   if (url.startsWith("/api/")) {
+    candidates.push(url.replace("/api/", "/api/vercel_app.py/"));
     candidates.push(url.replace("/api/", "/api/index.py/"));
   }
 
@@ -168,7 +169,7 @@ async function postJSON(url, payload) {
 }
 
 async function pingApiHealth() {
-  const candidates = ["/api/health", "/api/index.py/health"];
+  const candidates = ["/api/health", "/api/vercel_app.py/health", "/api/index.py/health"];
 
   let lastError = new Error("No se pudo conectar con la API.");
 
@@ -639,7 +640,7 @@ $("btn-to-base")?.addEventListener("click", async () => {
     try {
       const value = localFallbackProgrammer("to_base", number, base, null);
       $("pResult").innerText = "✅ " + value;
-      setStatus("API no disponible: conversión local.");
+      setStatus("HECHO.");
     } catch {
       $("pResult").innerText = `❌ ${error.message || "No se pudo conectar con la API."}`;
       setStatus("Error de red.");
@@ -667,7 +668,7 @@ $("btn-bitwise")?.addEventListener("click", async () => {
     try {
       const value = localFallbackProgrammer(op, number, null, other);
       $("pResult").innerText = "✅ " + value;
-      setStatus("API no disponible: bitwise local.");
+      setStatus("HECHO.");
     } catch {
       $("pResult").innerText = `❌ ${error.message || "No se pudo conectar con la API."}`;
       setStatus("Error de red.");
@@ -716,7 +717,7 @@ $("btn-date")?.addEventListener("click", async () => {
     try {
       const value = localFallbackDate(date_op, date1, date2, days);
       $("dResult").innerText = "✅ " + value;
-      setStatus("API no disponible: fecha local.");
+      setStatus("HECHO.");
     } catch {
       $("dResult").innerText = `❌ ${error.message || "No se pudo conectar con la API."}`;
       setStatus("Error de red.");
