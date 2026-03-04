@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calculadora Integral</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Calcu-len</div>
+
+      <button class="tab active" data-mode="standard">
+        <span class="ico">▦</span>
+      </button>
+
+      <button class="tab" data-mode="scientific">
+        <span class="ico">🧑🏼‍🔬</span>
+      </button>
+
+      <button class="tab" data-mode="graph">
+        <span class="ico">📊</span>
+      </button>
+
+      <button class="tab" data-mode="programmer">
+        <span class="ico">&lt;/&gt;</span>
+      </button>
+
+      <button class="tab" data-mode="date">
+        <span class="ico">🗓️</span>
+      </button>
+
+      <div class="hint">
+        <button id="tipsToggle" class="tips-toggle">
+          Tips rápidos ▼
+        </button>
+      
+        <div id="tipsContent" class="tips-content hidden">
+          <div id="tipText" class="tip-text"></div>
+      
+          <button id="newTipBtn" class="btn primary" style="margin-top:10px;">
+            Otro
+          </button>
+        </div>
+      </div>
+
+    </aside>
+
+    <main class="main">
+      <header class="header">
+        <button id="menuToggle" class="menu-toggle">☰</button>
+        <h1 id="title">Estándar</h1>
+        <div class="status" id="status">Listo.</div>
+      </header>
+
+      <!-- Standard / Scientific -->
+      <section class="panel" id="panel-expression">
+        <label class="label" for="expression">Expresión</label>
+        <input id="expression" class="input" placeholder="Ej: (2+3)*4 - 5/2" />
+        <p class="help-text">Atajo: presioná <strong>Enter</strong> para calcular rápidamente.</p>
+        <div class="row">
+          <button class="btn primary" id="btn-calc">Calcular</button>
+          <button class="btn" id="btn-clear">Limpiar</button>
+        </div>
+        <div class="result" id="result"></div>
+      </section>
+
+      <!-- Graph -->
+      <section class="panel hidden" id="panel-graph">
+        <div class="grid2">
+          <div>
+            <label class="label" for="graphExpression">f(x)</label>
+            <input id="graphExpression" class="input" placeholder="Ej: sin(x) + x**2" />
+            <p class="help-text">Podés separar múltiples funciones con coma. También podés usar <strong>x^2</strong>.</p>
+          </div>
+          <div>
+            <label class="label" for="samples">Muestras</label>
+            <input id="samples" class="input" type="number" min="10" max="2000" value="200" />
+          </div>
+          <div>
+            <label class="label" for="xmin">x mín</label>
+            <input id="xmin" class="input" type="number" value="-10" />
+          </div>
+          <div>
+            <label class="label" for="xmax">x máx</label>
+            <input id="xmax" class="input" type="number" value="10" />
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="btn-plot">Graficar</button>
+          <button class="btn" id="btn-plot-clear">Limpiar</button>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chart"></canvas>
+        </div>
+        <div class="result hidden" id="graphResult"></div>
+      </section>
+
+      <!-- Programmer -->
+      <section class="panel hidden" id="panel-programmer">
+        <div class="grid2">
+          <div>
+            <label class="label" for="pNumber">Número (decimal)</label>
+            <input id="pNumber" class="input" type="number" value="42" />
+          </div>
+          <div>
+            <label class="label" for="pBase">Base destino</label>
+            <select id="pBase" class="input">
+              <option value="2">Binario</option>
+              <option value="8">Octal</option>
+              <option value="10" selected>Decimal</option>
+              <option value="16">Hex</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn primary" id="btn-to-base">Convertir a base</button>
+        </div>
+
+        <hr class="sep"/>
+
+        <div class="grid2">
+          <div>
+            <label class="label" for="pOp">Operación bitwise</label>
+            <select id="pOp" class="input">
+              <option value="bit_and">AND (&)</option>
+              <option value="bit_or">OR (|)</option>
+              <option value="bit_xor">XOR (^)</option>
+              <option value="bit_not">NOT (~)</option>
+              <option value="shl">Shift Left (&lt;&lt;)</option>
+              <option value="shr">Shift Right (&gt;&gt;)</option>
+            </select>
+          </div>
+          <div>
+            <label class="label" for="pOther">OTRO (si aplica)</label>
+            <input id="pOther" class="input" type="number" value="7" />
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn primary" id="btn-bitwise">Ejecutar</button>
+          <button class="btn" id="btn-prog-clear">Limpiar</button>
+        </div>
+
+        <div class="result" id="pResult"></div>
+      </section>
+
+      <!-- Date -->
+      <section class="panel hidden" id="panel-date">
+        <div class="grid2">
+          <div>
+            <label class="label" for="d1">Fecha 1</label>
+            <input id="d1" class="input" type="date" />
+          </div>
+          <div>
+            <label class="label" for="d2">Fecha 2</label>
+            <input id="d2" class="input" type="date" />
+          </div>
+          <div>
+            <label class="label" for="days">Días</label>
+            <input id="days" class="input" type="number" value="7" />
+          </div>
+          <div>
+            <label class="label" for="dOp">Operación</label>
+            <select id="dOp" class="input">
+              <option value="diff">Diferencia (Fecha2 - Fecha1)</option>
+              <option value="add">Sumar días a Fecha1</option>
+              <option value="sub">Restar días a Fecha1</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn primary" id="btn-date">Calcular</button>
+          <button class="btn" id="btn-date-clear">Limpiar</button>
+        </div>
+
+        <div class="result" id="dResult"></div>
+      </section>
+      <footer class="app-footer" id="appFooter"></footer>
+    </main>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
