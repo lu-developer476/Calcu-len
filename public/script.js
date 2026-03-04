@@ -210,7 +210,6 @@ async function setApiAngleMode(mode) {
 
   const candidates = [
     `/api/angle-mode?mode=${encodeURIComponent(normalized)}`,
-    `/api/vercel_app.py/angle-mode?mode=${encodeURIComponent(normalized)}`,
     `/api/index.py/angle-mode?mode=${encodeURIComponent(normalized)}`
   ];
 
@@ -409,7 +408,7 @@ async function calculateExpression() {
         currentMode === "scientific" ? ($("angleMode")?.value || currentAngleMode) : "RAD"
       );
       $("result").innerText = "✅ " + fallback;
-      setStatus("HECHO.");
+      setStatus("API no disponible: cálculo local.");
     } catch {
       $("result").innerText = "❌ No se pudo conectar con la API.";
       setStatus("Error de red.");
@@ -597,7 +596,7 @@ $("btn-plot")?.addEventListener("click", async () => {
         },
       });
 
-      setStatus("HECHO.");
+      setStatus("API no disponible: gráfica local.");
     } catch {
       graphResult.classList.remove("hidden");
       graphResult.innerText = "❌ No se pudo conectar con la API.";

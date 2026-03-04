@@ -74,5 +74,4 @@ Podés abrir `public/index.html` con Live Server o con cualquier servidor estát
 - Se acepta `^` como potencia desde el frontend (se normaliza a `**`).
 - La gráfica descarta valores no finitos para evitar errores de render y JSON inválido.
 - Se muestran estados de carga y feedback de error en cada flujo principal.
-- Si la API no responde, el frontend aplica fallback local para cálculo estándar/científico y graficado básico.
-- Modo científico en **radianes (RAD)** por defecto; podés cambiar entre DEG/RAD desde la UI científica o vía `POST /api/angle-mode`.
+- Modo científico en **grados (DEG)** por defecto; podés cambiar a RAD vía `POST /api/angle-mode`.
