@@ -469,5 +469,3 @@ def graph(req: GraphRequest, request: Request):
 
     return {"datasets": datasets}
 
-
-handler = app
