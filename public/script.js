@@ -13,6 +13,7 @@ const panels = {
 };
 
 let currentMode = "standard";
+let currentAngleMode = "RAD";
 
 /* ============================= */
 /* UI Helpers */
@@ -30,7 +31,13 @@ function renderFooter() {
 }
 
 function normalizeExpression(expr) {
-  return expr.replaceAll("^", "**");
+  return expr
+    .replaceAll("^", "**")
+    .replaceAll("×", "*")
+    .replaceAll("÷", "/")
+    .replaceAll("−", "-")
+    .replaceAll("π", "pi")
+    .replaceAll("√", "sqrt");
 }
 
 function setButtonLoading(buttonId, isLoading, loadingText) {
@@ -57,6 +64,13 @@ function setTitle(mode) {
     date: "Cálculo de fechas",
   };
   $("title").innerText = titles[mode] ?? mode;
+}
+
+
+function toggleScientificControls(isScientific) {
+  const controls = $("scientific-angle-controls");
+  if (!controls) return;
+  controls.classList.toggle("hidden", !isScientific);
 }
 
 function showPanel(mode) {
@@ -107,6 +121,7 @@ tabs.forEach(btn => {
     currentMode = btn.dataset.mode;
     setTitle(currentMode);
     showPanel(currentMode);
+    toggleScientificControls(currentMode === "scientific");
     clearOutputs();
     setStatus("Listo.");
 
@@ -125,6 +140,7 @@ async function postJSON(url, payload) {
   const candidates = [url];
 
   if (url.startsWith("/api/")) {
+    candidates.push(url.replace("/api/", "/api/vercel_app.py/"));
     candidates.push(url.replace("/api/", "/api/index.py/"));
   }
 
@@ -159,21 +175,75 @@ async function postJSON(url, payload) {
 }
 
 async function pingApiHealth() {
-  const candidates = ["/api/health", "/api/index.py/health"];
+  const candidates = ["/api/health", "/api/vercel_app.py/health", "/api/index.py/health"];
 
-  let data = null;
-  try {
-    data = await res.json();
-  } catch {
-    data = null;
+  let lastError = new Error("No se pudo conectar con la API.");
+
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate);
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+
+      if (data?.angle_mode === "RAD" || data?.angle_mode === "DEG") {
+        currentAngleMode = data.angle_mode;
+        if ($("angleMode")) {
+          $("angleMode").value = currentAngleMode;
+        }
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  if (!res.ok) {
-    throw new Error(data?.error || `HTTP ${res.status}`);
-  }
-
-  return data;
+  throw lastError;
 }
+
+async function setApiAngleMode(mode) {
+  const normalized = String(mode || "").toUpperCase();
+  if (normalized !== "RAD" && normalized !== "DEG") return;
+
+  const candidates = [
+    `/api/angle-mode?mode=${encodeURIComponent(normalized)}`,
+    `/api/vercel_app.py/angle-mode?mode=${encodeURIComponent(normalized)}`,
+    `/api/index.py/angle-mode?mode=${encodeURIComponent(normalized)}`
+  ];
+
+  let lastError = new Error("No se pudo actualizar el modo angular.");
+
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate, { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok || data?.error) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+
+      currentAngleMode = data.mode || normalized;
+      if ($("angleMode")) {
+        $("angleMode").value = currentAngleMode;
+      }
+      return currentAngleMode;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
 
 function toLocalMathExpression(expr) {
   return normalizeExpression(expr)
@@ -188,21 +258,39 @@ function toLocalMathExpression(expr) {
     .replace(/\bceil\s*\(/g, "Math.ceil(")
     .replace(/\bround\s*\(/g, "Math.round(")
     .replace(/\bexp\s*\(/g, "Math.exp(")
-    .replace(/\bsin\s*\(/g, "Math.sin(")
-    .replace(/\bcos\s*\(/g, "Math.cos(")
-    .replace(/\btan\s*\(/g, "Math.tan(")
-    .replace(/\basin\s*\(/g, "Math.asin(")
-    .replace(/\bacos\s*\(/g, "Math.acos(")
-    .replace(/\batan\s*\(/g, "Math.atan(")
     .replace(/\bsinh\s*\(/g, "Math.sinh(")
     .replace(/\bcosh\s*\(/g, "Math.cosh(")
-    .replace(/\btanh\s*\(/g, "Math.tanh(");
+    .replace(/\btanh\s*\(/g, "Math.tanh(")
+    .replace(/\bsin\s*\(/g, "__sin(")
+    .replace(/\bcos\s*\(/g, "__cos(")
+    .replace(/\btan\s*\(/g, "__tan(")
+    .replace(/\basin\s*\(/g, "__asin(")
+    .replace(/\bacos\s*\(/g, "__acos(")
+    .replace(/\batan\s*\(/g, "__atan(");
 }
 
-function evalLocalExpression(expr, x = undefined) {
+function evalLocalExpression(expr, x = undefined, angleMode = "RAD") {
   const safeExpr = toLocalMathExpression(expr);
-  const fn = new Function("x", `return (${safeExpr});`);
-  const value = fn(x);
+  const useDeg = angleMode === "DEG";
+
+  const __sin = useDeg ? (v) => Math.sin((v * Math.PI) / 180) : Math.sin;
+  const __cos = useDeg ? (v) => Math.cos((v * Math.PI) / 180) : Math.cos;
+  const __tan = useDeg ? (v) => Math.tan((v * Math.PI) / 180) : Math.tan;
+  const __asin = useDeg ? (v) => (Math.asin(v) * 180) / Math.PI : Math.asin;
+  const __acos = useDeg ? (v) => (Math.acos(v) * 180) / Math.PI : Math.acos;
+  const __atan = useDeg ? (v) => (Math.atan(v) * 180) / Math.PI : Math.atan;
+
+  const fn = new Function(
+    "x",
+    "__sin",
+    "__cos",
+    "__tan",
+    "__asin",
+    "__acos",
+    "__atan",
+    `return (${safeExpr});`
+  );
+  const value = fn(x, __sin, __cos, __tan, __asin, __acos, __atan);
 
   if (!Number.isFinite(value)) {
     throw new Error("Resultado no finito");
@@ -211,13 +299,31 @@ function evalLocalExpression(expr, x = undefined) {
   return value;
 }
 
-function localFallbackCalculate(mode, expr) {
+function localFallbackCalculate(mode, expr, angleMode = "RAD") {
   if (mode !== "standard" && mode !== "scientific") {
     throw new Error("Modo no soportado en fallback local");
   }
 
-  const value = evalLocalExpression(expr);
+  const value = evalLocalExpression(expr, undefined, angleMode);
   return value.toFixed(5);
+}
+
+function localFallbackGraph(expressions, x_min, x_max, samples, angleMode = "RAD") {
+  const step = (x_max - x_min) / (samples - 1);
+  const xs = Array.from({ length: samples }, (_, i) => x_min + step * i);
+
+  return expressions.map((expression) => {
+    const ys = xs.map((x) => {
+      try {
+        const y = evalLocalExpression(expression, x, angleMode);
+        return Number.isFinite(y) ? y : null;
+      } catch {
+        return null;
+      }
+    });
+
+    return { expression, x: xs, y: ys };
+  });
 }
 
 function localFallbackProgrammer(op, number, base, other) {
@@ -284,6 +390,10 @@ async function calculateExpression() {
   setButtonLoading("btn-calc", true, "Calculando...");
 
   try {
+    if (currentMode === "scientific") {
+      await setApiAngleMode($("angleMode")?.value || currentAngleMode);
+    }
+
     const data = await postJSON("/api/calculate", {
       mode: currentMode,
       expression: normalizeExpression(expr),
@@ -298,8 +408,18 @@ async function calculateExpression() {
     setStatus("HECHO.");
 
   } catch {
-    $("result").innerText = "❌ No se pudo conectar con la API.";
-    setStatus("Error de red.");
+    try {
+      const fallback = localFallbackCalculate(
+        currentMode,
+        normalizeExpression(expr),
+        currentMode === "scientific" ? ($("angleMode")?.value || currentAngleMode) : "RAD"
+      );
+      $("result").innerText = "✅ " + fallback;
+      setStatus("HECHO.");
+    } catch {
+      $("result").innerText = "❌ No se pudo conectar con la API.";
+      setStatus("Error de red.");
+    }
   } finally {
     setButtonLoading("btn-calc", false);
   }
@@ -447,9 +567,48 @@ $("btn-plot")?.addEventListener("click", async () => {
     setStatus("HECHO.");
 
   } catch {
-    graphResult.classList.remove("hidden");
-    graphResult.innerText = "❌ No se pudo conectar con la API.";
-    setStatus("Error de red.");
+    try {
+      const fallbackDatasets = localFallbackGraph(expressions, x_min, x_max, samples, currentAngleMode);
+
+      destroyChart();
+      const ctx = $("chart").getContext("2d");
+      const datasets = fallbackDatasets
+        .map((set) => ({
+          label: set.expression,
+          data: set.x
+            .map((xVal, i) => ({ x: xVal, y: set.y[i] }))
+            .filter((point) => point.y !== null && Number.isFinite(point.y)),
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.2,
+          fill: false,
+        }))
+        .filter((dataset) => dataset.data.length > 0);
+
+      if (!datasets.length) {
+        throw new Error("No se pudieron graficar puntos válidos");
+      }
+
+      chart = new Chart(ctx, {
+        type: "line",
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          parsing: false,
+          scales: {
+            x: { type: "linear", min: x_min, max: x_max },
+            y: { type: "linear" },
+          },
+        },
+      });
+
+      setStatus("HECHO.");
+    } catch {
+      graphResult.classList.remove("hidden");
+      graphResult.innerText = "❌ No se pudo conectar con la API.";
+      setStatus("Error de red.");
+    }
   } finally {
     setButtonLoading("btn-plot", false);
   }
@@ -488,7 +647,7 @@ $("btn-to-base")?.addEventListener("click", async () => {
     try {
       const value = localFallbackProgrammer("to_base", number, base, null);
       $("pResult").innerText = "✅ " + value;
-      setStatus("API no disponible: conversión local.");
+      setStatus("HECHO.");
     } catch {
       $("pResult").innerText = `❌ ${error.message || "No se pudo conectar con la API."}`;
       setStatus("Error de red.");
@@ -516,7 +675,7 @@ $("btn-bitwise")?.addEventListener("click", async () => {
     try {
       const value = localFallbackProgrammer(op, number, null, other);
       $("pResult").innerText = "✅ " + value;
-      setStatus("API no disponible: bitwise local.");
+      setStatus("HECHO.");
     } catch {
       $("pResult").innerText = `❌ ${error.message || "No se pudo conectar con la API."}`;
       setStatus("Error de red.");
@@ -565,7 +724,7 @@ $("btn-date")?.addEventListener("click", async () => {
     try {
       const value = localFallbackDate(date_op, date1, date2, days);
       $("dResult").innerText = "✅ " + value;
-      setStatus("API no disponible: fecha local.");
+      setStatus("HECHO.");
     } catch {
       $("dResult").innerText = `❌ ${error.message || "No se pudo conectar con la API."}`;
       setStatus("Error de red.");
@@ -648,5 +807,23 @@ $("graphExpression")?.addEventListener("keydown", (e) => {
   }
 });
 
+
+$("angleMode")?.addEventListener("change", async () => {
+  try {
+    await setApiAngleMode($("angleMode").value);
+    setStatus(`Modo angular: ${currentAngleMode}`);
+  } catch (error) {
+    setStatus("No se pudo actualizar DEG/RAD.");
+  }
+});
+
+(async () => {
+  toggleScientificControls(currentMode === "scientific");
+  try {
+    await pingApiHealth();
+  } catch {
+    setStatus("Error de red.");
+  }
+})();
 
 renderFooter();
