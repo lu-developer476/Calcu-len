@@ -31,7 +31,13 @@ function renderFooter() {
 }
 
 function normalizeExpression(expr) {
-  return expr.replaceAll("^", "**");
+  return expr
+    .replaceAll("^", "**")
+    .replaceAll("×", "*")
+    .replaceAll("÷", "/")
+    .replaceAll("−", "-")
+    .replaceAll("π", "pi")
+    .replaceAll("√", "sqrt");
 }
 
 function setButtonLoading(buttonId, isLoading, loadingText) {

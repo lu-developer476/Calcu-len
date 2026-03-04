@@ -72,6 +72,7 @@ Podés abrir `public/index.html` con Live Server o con cualquier servidor estát
 
 ## Notas de UX
 - Se acepta `^` como potencia desde el frontend (se normaliza a `**`).
+- Se aceptan `^`, `√`, `×`, `÷`, `π` y `−`; se normalizan automáticamente para cálculo científico.
 - La gráfica descarta valores no finitos para evitar errores de render y JSON inválido.
 - Se muestran estados de carga y feedback de error en cada flujo principal.
 - Modo científico en **grados (DEG)** por defecto; podés cambiar a RAD vía `POST /api/angle-mode`.

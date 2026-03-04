@@ -135,6 +135,16 @@ class SafeEvalError(ValueError):
     pass
 
 
+def _normalize_expression(expr: str) -> str:
+    normalized = expr.strip()
+    normalized = normalized.replace("^", "**")
+    normalized = normalized.replace("×", "*").replace("÷", "/")
+    normalized = normalized.replace("−", "-")
+    normalized = normalized.replace("√", "sqrt")
+    normalized = normalized.replace("π", "pi")
+    return normalized
+
+
 def _to_plot_value(value: Union[float, complex]) -> Optional[float]:
     numeric = value.real if isinstance(value, complex) else value
 
@@ -198,6 +208,7 @@ def format_result(value: Union[float, complex]) -> str:
 
 def safe_eval(expr: str, variables: Optional[Dict[str, Union[float, complex]]] = None) -> Union[float, complex]:
     variables = variables or {}
+    expr = _normalize_expression(expr)
     expr = re.sub(r"(?<![a-zA-Z])i(?![a-zA-Z])", "j", expr)
 
     try:
