@@ -81,8 +81,6 @@ def unhandled_exception_handler(request: Request, exc: Exception):
     )
 
 
-app = FastAPI(title="Calculadora Pro API", version="1.2.1")
-START_TIME = datetime.utcnow()
 ANGLE_MODE = "RAD"
 
 _ALLOWED_BINOPS = {
@@ -99,8 +97,6 @@ _ALLOWED_UNARYOPS = {
     ast.UAdd: lambda a: +a,
     ast.USub: lambda a: -a,
 }
-
-ANGLE_MODE = "RAD"
 
 _ALLOWED_FUNCS = {
     "sqrt": cmath.sqrt,
@@ -166,15 +162,6 @@ def _check_rate_limit(client_id: str, endpoint: str, limit: int, window_s: int) 
 
         bucket.append(now)
         return True
-
-
-def _to_plot_value(value):
-    numeric = value.real if isinstance(value, complex) else value
-    if not isinstance(numeric, (int, float)):
-        return None
-    if not math.isfinite(float(numeric)):
-        return None
-    return float(numeric)
 
 
 def numerical_integral(expr, a, b, n=1000):
@@ -367,17 +354,8 @@ def calculate(req: CalcRequest):
     mode = req.mode
 
     if mode in ("standard", "scientific"):
-        expression = payload.get("expression")
-        if not expression:
-            return {"error": "Falta la expresión"}
-        try:
-            return {"result": format_result(safe_eval(req.expression))}
-        except SafeEvalError as exc:
-            return {"error": str(exc)}
-
-    if mode == "scientific":
         if not req.expression:
-            return {"error": "Falta la expresión (ej: sqrt(9), sin(pi/2), log(100))"}
+            return {"error": "Falta la expresión"}
         try:
             return {"result": format_result(safe_eval(req.expression))}
         except SafeEvalError as exc:
@@ -387,10 +365,11 @@ def calculate(req: CalcRequest):
         if req.op in ("to_base", "from_base"):
             if req.number is None or req.base is None:
                 return {"error": "Faltan number/base"}
-            if int(base) not in (2, 8, 10, 16):
+            if int(req.base) not in (2, 8, 10, 16):
                 return {"error": "Base inválida (2/8/10/16)"}
-            n = int(number)
-            base = int(base)
+            n = int(req.number)
+            base = int(req.base)
+            op = req.op
             if op == "to_base":
                 if base == 2:
                     return {"result": bin(n)}
@@ -412,12 +391,10 @@ def calculate(req: CalcRequest):
 
         n = int(req.number)
         op = (req.op or "").strip().lower()
-
-        n = int(number)
         if op in ("bit_and", "bit_or", "bit_xor", "shl", "shr"):
-            if other is None:
+            if req.other is None:
                 return {"error": "Falta other"}
-            o = int(other)
+            o = int(req.other)
             if op == "bit_and":
                 return {"result": n & o}
             if op == "bit_or":
@@ -433,10 +410,10 @@ def calculate(req: CalcRequest):
         return {"error": "Operación inválida"}
 
     if mode == "date":
-        op = str(payload.get("date_op", "")).strip().lower()
-        date1 = payload.get("date1")
-        date2 = payload.get("date2")
-        days = payload.get("days")
+        op = str(req.date_op or "").strip().lower()
+        date1 = req.date1
+        date2 = req.date2
+        days = req.days
 
         try:
             d1 = datetime.strptime(date1, "%Y-%m-%d").date() if date1 else None
@@ -492,5 +469,3 @@ def graph(req: GraphRequest, request: Request):
 
     return {"datasets": datasets}
 
-
-handler = app

@@ -13,6 +13,7 @@ const panels = {
 };
 
 let currentMode = "standard";
+let currentAngleMode = "RAD";
 
 /* ============================= */
 /* UI Helpers */
@@ -57,6 +58,13 @@ function setTitle(mode) {
     date: "Cálculo de fechas",
   };
   $("title").innerText = titles[mode] ?? mode;
+}
+
+
+function toggleScientificControls(isScientific) {
+  const controls = $("scientific-angle-controls");
+  if (!controls) return;
+  controls.classList.toggle("hidden", !isScientific);
 }
 
 function showPanel(mode) {
@@ -107,6 +115,7 @@ tabs.forEach(btn => {
     currentMode = btn.dataset.mode;
     setTitle(currentMode);
     showPanel(currentMode);
+    toggleScientificControls(currentMode === "scientific");
     clearOutputs();
     setStatus("Listo.");
 
@@ -161,19 +170,72 @@ async function postJSON(url, payload) {
 async function pingApiHealth() {
   const candidates = ["/api/health", "/api/index.py/health"];
 
-  let data = null;
-  try {
-    data = await res.json();
-  } catch {
-    data = null;
+  let lastError = new Error("No se pudo conectar con la API.");
+
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate);
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+
+      if (data?.angle_mode === "RAD" || data?.angle_mode === "DEG") {
+        currentAngleMode = data.angle_mode;
+        if ($("angleMode")) {
+          $("angleMode").value = currentAngleMode;
+        }
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  if (!res.ok) {
-    throw new Error(data?.error || `HTTP ${res.status}`);
-  }
-
-  return data;
+  throw lastError;
 }
+
+async function setApiAngleMode(mode) {
+  const normalized = String(mode || "").toUpperCase();
+  if (normalized !== "RAD" && normalized !== "DEG") return;
+
+  const candidates = [
+    `/api/angle-mode?mode=${encodeURIComponent(normalized)}`,
+    `/api/index.py/angle-mode?mode=${encodeURIComponent(normalized)}`
+  ];
+
+  let lastError = new Error("No se pudo actualizar el modo angular.");
+
+  for (const candidate of candidates) {
+    try {
+      const res = await fetch(candidate, { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok || data?.error) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+
+      currentAngleMode = data.mode || normalized;
+      if ($("angleMode")) {
+        $("angleMode").value = currentAngleMode;
+      }
+      return currentAngleMode;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
 
 function toLocalMathExpression(expr) {
   return normalizeExpression(expr)
@@ -284,6 +346,10 @@ async function calculateExpression() {
   setButtonLoading("btn-calc", true, "Calculando...");
 
   try {
+    if (currentMode === "scientific") {
+      await setApiAngleMode($("angleMode")?.value || currentAngleMode);
+    }
+
     const data = await postJSON("/api/calculate", {
       mode: currentMode,
       expression: normalizeExpression(expr),
@@ -648,5 +714,23 @@ $("graphExpression")?.addEventListener("keydown", (e) => {
   }
 });
 
+
+$("angleMode")?.addEventListener("change", async () => {
+  try {
+    await setApiAngleMode($("angleMode").value);
+    setStatus(`Modo angular: ${currentAngleMode}`);
+  } catch (error) {
+    setStatus("No se pudo actualizar DEG/RAD.");
+  }
+});
+
+(async () => {
+  toggleScientificControls(currentMode === "scientific");
+  try {
+    await pingApiHealth();
+  } catch {
+    setStatus("Error de red.");
+  }
+})();
 
 renderFooter();
