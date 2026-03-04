@@ -479,3 +479,4 @@ def graph(req: GraphRequest, request: Request):
         datasets.append({"expression": expr, "x": xs, "y": ys})
 
     return {"datasets": datasets}
+
