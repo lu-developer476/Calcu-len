@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Calculadora Integral</title>
+  <link rel="icon" type="image/x-icon" href="favicon.svg" />
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -59,6 +60,15 @@
       <section class="panel" id="panel-expression">
         <label class="label" for="expression">Expresión</label>
         <input id="expression" class="input" placeholder="Ej: (2+3)*4 - 5/2" />
+
+        <div class="row hidden" id="scientific-angle-controls">
+          <label class="label" for="angleMode">Ángulo</label>
+          <select id="angleMode" class="input" style="max-width: 160px;">
+            <option value="RAD">RAD</option>
+            <option value="DEG">DEG</option>
+          </select>
+        </div>
+
         <p class="help-text">Atajo: presioná <strong>Enter</strong> para calcular rápidamente.</p>
         <div class="row">
           <button class="btn primary" id="btn-calc">Calcular</button>
