@@ -1,4 +1,4 @@
-# Calcu-len (Python + HTML + Vercel)
+# Calcu-len
 
 Calculadora web multi-modo orientada a precisión matemática, experiencia de usuario y despliegue profesional.
 
