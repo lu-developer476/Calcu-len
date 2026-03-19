@@ -10,7 +10,6 @@
 ![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
 ![HTTPX](https://img.shields.io/badge/HTTPX-000000?style=for-the-badge)
 ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
-![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 Calculadora web integral orientada a precisión matemática, experiencia de usuario y despliegue profesional.
 
