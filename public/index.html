@@ -223,6 +223,40 @@
           </div>
           <div class="result result-financial" id="financialTipResult"></div>
         </div>
+
+        <div class="financial-section">
+          <h2 class="financial-heading">Calculadora de cuotas</h2>
+          <div class="grid2">
+            <div>
+              <label class="label" for="financialPrice">Precio base</label>
+              <input id="financialPrice" class="input" type="number" min="0" step="0.01" placeholder="Ej: 250000" />
+            </div>
+            <div>
+              <label class="label" for="financialDownPayment">Anticipo</label>
+              <input id="financialDownPayment" class="input" type="number" min="0" step="0.01" placeholder="0" value="0" />
+            </div>
+            <div>
+              <label class="label" for="financialInstallments">Cantidad de cuotas</label>
+              <input id="financialInstallments" class="input" type="number" min="1" step="1" placeholder="Ej: 12" />
+            </div>
+            <div>
+              <label class="label" for="financialInterestMode">Tipo de financiación</label>
+              <select id="financialInterestMode" class="input">
+                <option value="none">Sin interés</option>
+                <option value="with_interest">Con interés</option>
+              </select>
+            </div>
+            <div>
+              <label class="label" for="financialInterestRate">Porcentaje de interés / recargo</label>
+              <input id="financialInterestRate" class="input" type="number" min="0" step="0.01" placeholder="Ej: 15" value="0" />
+            </div>
+          </div>
+          <div class="row">
+            <button class="btn primary" id="btn-financial-installments">Calcular</button>
+            <button class="btn" id="btn-financial-installments-clear">Limpiar</button>
+          </div>
+          <div class="result result-financial" id="financialInstallmentsResult"></div>
+        </div>
       </section>
       <footer class="app-footer" id="appFooter"></footer>
     </main>
