@@ -275,7 +275,7 @@ def safe_eval(expr: str, variables: Optional[Dict[str, Union[float, complex]]] =
 
 
 class CalcRequest(BaseModel):
-    mode: str = Field(..., description="standard | scientific | programmer | date")
+    mode: str = Field(..., description="standard | scientific | programmer | date | financial")
     expression: Optional[str] = None
     number: Optional[int] = None
     base: Optional[int] = Field(default=None, description="2, 8, 10, 16")
@@ -285,11 +285,20 @@ class CalcRequest(BaseModel):
     date2: Optional[str] = None
     days: Optional[int] = None
     date_op: Optional[str] = None
+    financial_op: Optional[str] = None
+    amount: Optional[float] = None
+    percentage: Optional[float] = None
+    calculation_type: Optional[str] = None
+    price: Optional[float] = None
+    down_payment: Optional[float] = None
+    installments: Optional[int] = None
+    interest_rate: Optional[float] = None
+    interest_mode: Optional[str] = None
 
     @field_validator("mode")
     @classmethod
     def validate_mode(cls, value: str) -> str:
-        valid_modes = {"standard", "scientific", "programmer", "date"}
+        valid_modes = {"standard", "scientific", "programmer", "date", "financial"}
         mode = value.strip().lower()
         if mode not in valid_modes:
             raise ValueError("Modo inválido")
@@ -332,6 +341,74 @@ class GraphRequest(BaseModel):
 
 
 
+
+
+def _ensure_non_negative(value: Optional[float], field_name: str) -> float:
+    if value is None:
+        raise ValueError(f"Falta {field_name}")
+    numeric_value = float(value)
+    if numeric_value < 0:
+        raise ValueError(f"{field_name} no puede ser negativo")
+    return numeric_value
+
+
+def _calculate_tip_discount(amount: float, percentage: float, calculation_type: str) -> Dict[str, Any]:
+    normalized_type = "discount" if calculation_type == "discount" else "tip"
+    calculated_amount = amount * (percentage / 100)
+    total = amount - calculated_amount if normalized_type == "discount" else amount + calculated_amount
+    label = "Descuento" if normalized_type == "discount" else "Propina"
+
+    return {
+        "result": (
+            f"{label}: ${calculated_amount:.2f} • "
+            f"Monto base: ${amount:.2f} • "
+            f"Total final: ${total:.2f}"
+        ),
+        "base_amount": amount,
+        "calculated_amount": calculated_amount,
+        "total": total,
+        "calculation_type": normalized_type,
+    }
+
+
+def _calculate_installments(
+    price: float,
+    down_payment: float,
+    installments: int,
+    interest_rate: float,
+    interest_mode: str,
+) -> Dict[str, Any]:
+    if down_payment > price:
+        raise ValueError("El anticipo no puede ser mayor que el precio base")
+    if installments <= 0:
+        raise ValueError("La cantidad de cuotas debe ser mayor a 0")
+
+    normalized_mode = "with_interest" if interest_mode == "with_interest" else "none"
+    financed_amount = round(price - down_payment, 2)
+    total_financed = round(
+        financed_amount * (1 + (interest_rate / 100))
+        if normalized_mode == "with_interest"
+        else financed_amount,
+        2,
+    )
+    surcharge_amount = round(total_financed - financed_amount, 2)
+    installment_value = round(total_financed / installments, 2)
+
+    return {
+        "result": (
+            f"Monto financiado: ${financed_amount:.2f} • "
+            f"Recargo total: ${surcharge_amount:.2f} • "
+            f"Total financiado: ${total_financed:.2f} • "
+            f"{installments} cuota(s) de ${installment_value:.2f}"
+        ),
+        "base_price": price,
+        "down_payment": down_payment,
+        "financed_amount": financed_amount,
+        "surcharge_amount": surcharge_amount,
+        "total_financed": total_financed,
+        "installment_value": installment_value,
+        "installments": installments,
+    }
 
 
 # ---------------------------
@@ -445,6 +522,36 @@ def calculate(req: CalcRequest):
             return {"result": out.isoformat()}
 
         return {"error": "Operación inválida (diff/add/sub)"}
+
+    if mode == "financial":
+        op = str(req.financial_op or "").strip().lower()
+
+        try:
+            if op == "tip_discount":
+                amount = _ensure_non_negative(req.amount, "amount")
+                percentage = _ensure_non_negative(req.percentage, "percentage")
+                calculation_type = str(req.calculation_type or "tip").strip().lower()
+                if calculation_type not in {"tip", "discount"}:
+                    return {"error": "Tipo de cálculo inválido (tip/discount)"}
+                return _calculate_tip_discount(amount, percentage, calculation_type)
+
+            if op == "installments":
+                price = _ensure_non_negative(req.price, "price")
+                down_payment = _ensure_non_negative(req.down_payment or 0, "down_payment")
+                interest_rate = _ensure_non_negative(req.interest_rate or 0, "interest_rate")
+                if req.installments is None:
+                    return {"error": "Falta installments"}
+                return _calculate_installments(
+                    price=price,
+                    down_payment=down_payment,
+                    installments=int(req.installments),
+                    interest_rate=interest_rate,
+                    interest_mode=str(req.interest_mode or "none").strip().lower(),
+                )
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+        return {"error": "Operación financiera inválida"}
 
     return {"error": "Modo inválido"}
 
