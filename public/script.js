@@ -91,7 +91,6 @@ function clearOutputs() {
   $("graphResult").innerText = "";
   $("graphResult").classList.add("hidden");
   $("financialTipResult").innerText = "";
-  $("financialInstallmentsResult").innerText = "";
 }
 
 function formatMoney(value) {
@@ -118,32 +117,16 @@ function parseNonNegativeNumber(rawValue, label, { allowEmpty = false, defaultVa
   return parsed;
 }
 
-function parsePositiveInteger(rawValue, label) {
-  const parsed = Number(String(rawValue ?? "").trim());
-
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${label} debe ser un entero mayor a 0.`);
-  }
-
-  return parsed;
-}
 
 function renderTipDiscountResult(data) {
   const typeLabel = data.calculation_type === "discount" ? "Descuento" : "Propina";
   return [
-    `${typeLabel}: $${formatMoney(data.calculated_amount)}`,
+    `${typeLabel} aplicado`,
     `Monto base: $${formatMoney(data.base_amount)}`,
+    `Porcentaje: ${formatMoney(data.percentage)}%`,
+    `Monto calculado: $${formatMoney(data.calculated_amount)}`,
     `Total final: $${formatMoney(data.total)}`,
-  ].join(" • ");
-}
-
-function renderInstallmentsResult(data) {
-  return [
-    `Monto financiado: $${formatMoney(data.financed_amount)}`,
-    `Recargo total: $${formatMoney(data.surcharge_amount)}`,
-    `Total financiado: $${formatMoney(data.total_financed)}`,
-    `${data.installments} cuota(s) de $${formatMoney(data.installment_value)}`,
-  ].join(" • ");
+  ].join("\n");
 }
 
 function getTipDiscountPayload() {
@@ -156,37 +139,6 @@ function getTipDiscountPayload() {
   };
 }
 
-function getInstallmentsPayload() {
-  const price = parseNonNegativeNumber($("installmentPrice").value, "el precio base");
-  const downPayment = parseNonNegativeNumber($("installmentDownPayment").value, "el anticipo", {
-    allowEmpty: true,
-    defaultValue: 0,
-  });
-  const installments = parsePositiveInteger($("installmentCount").value, "La cantidad de cuotas");
-  const interestMode = $("interestMode").value;
-  const interestRate = parseNonNegativeNumber($("interestRate").value, "el interés", {
-    allowEmpty: true,
-    defaultValue: 0,
-  });
-
-  if (downPayment > price) {
-    throw new Error("El anticipo no puede ser mayor que el precio base.");
-  }
-
-  if (interestMode === "none" && interestRate !== 0) {
-    $("interestRate").value = "0";
-  }
-
-  return {
-    mode: "financial",
-    financial_op: "installments",
-    price,
-    down_payment: downPayment,
-    installments,
-    interest_rate: interestMode === "none" ? 0 : interestRate,
-    interest_mode: interestMode,
-  };
-}
 
 /* ============================= */
 /* Sidebar Mobile Behavior */
@@ -476,66 +428,20 @@ function localFallbackTipDiscount(amount, percentage, calculationType) {
     ? amount - calculatedAmount
     : amount + calculatedAmount;
 
-  return {
-    result: renderTipDiscountResult({
-      base_amount: amount,
-      calculated_amount: calculatedAmount,
-      total,
-      calculation_type: normalizedType,
-    }),
+  const resultData = {
     base_amount: amount,
+    percentage,
     calculated_amount: calculatedAmount,
     total,
     calculation_type: normalizedType,
   };
-}
-
-function localFallbackInstallments(price, downPayment, installments, interestRate, interestMode) {
-  if (!Number.isFinite(price) || price < 0) {
-    throw new Error("Precio base inválido.");
-  }
-
-  if (!Number.isFinite(downPayment) || downPayment < 0) {
-    throw new Error("Anticipo inválido.");
-  }
-
-  if (!Number.isInteger(installments) || installments <= 0) {
-    throw new Error("La cantidad de cuotas debe ser mayor a 0.");
-  }
-
-  if (!Number.isFinite(interestRate) || interestRate < 0) {
-    throw new Error("Interés inválido.");
-  }
-
-  if (downPayment > price) {
-    throw new Error("El anticipo no puede ser mayor que el precio base.");
-  }
-
-  const normalizedMode = interestMode === "with_interest" ? "with_interest" : "none";
-  const financedAmount = price - downPayment;
-  const totalFinanced = normalizedMode === "with_interest"
-    ? financedAmount * (1 + interestRate / 100)
-    : financedAmount;
-  const surchargeAmount = totalFinanced - financedAmount;
-  const installmentValue = totalFinanced / installments;
 
   return {
-    result: renderInstallmentsResult({
-      financed_amount: financedAmount,
-      surcharge_amount: surchargeAmount,
-      total_financed: totalFinanced,
-      installment_value: installmentValue,
-      installments,
-    }),
-    base_price: price,
-    down_payment: downPayment,
-    financed_amount: financedAmount,
-    surcharge_amount: surchargeAmount,
-    total_financed: totalFinanced,
-    installment_value: installmentValue,
-    installments,
+    result: renderTipDiscountResult(resultData),
+    ...resultData,
   };
 }
+
 
 /* ============================= */
 /* Standard / Scientific */
@@ -930,58 +836,6 @@ $("btn-financial-tip-clear")?.addEventListener("click", () => {
   setStatus("Listo.");
 });
 
-$("btn-installments")?.addEventListener("click", async () => {
-  const output = $("financialInstallmentsResult");
-
-  try {
-    const payload = getInstallmentsPayload();
-    setStatus("Calculando cuotas...");
-    setButtonLoading("btn-installments", true, "Calculando...");
-
-    try {
-      const data = await postJSON("/api/calculate", payload);
-
-      if (data.error) {
-        output.innerText = `❌ ${data.error}`;
-        return setStatus("Error.");
-      }
-
-      output.innerText = `✅ ${data.result || renderInstallmentsResult(data)}`;
-      setStatus("HECHO.");
-    } catch {
-      const fallback = localFallbackInstallments(
-        payload.price,
-        payload.down_payment,
-        payload.installments,
-        payload.interest_rate,
-        payload.interest_mode
-      );
-      output.innerText = `✅ ${fallback.result}`;
-      setStatus("API no disponible: cálculo local.");
-    }
-  } catch (error) {
-    output.innerText = `❌ ${error.message}`;
-    setStatus("Revisá los datos ingresados.");
-  } finally {
-    setButtonLoading("btn-installments", false);
-  }
-});
-
-$("btn-installments-clear")?.addEventListener("click", () => {
-  $("installmentPrice").value = "";
-  $("installmentDownPayment").value = "0";
-  $("installmentCount").value = "";
-  $("interestMode").value = "none";
-  $("interestRate").value = "0";
-  $("financialInstallmentsResult").innerText = "";
-  setStatus("Listo.");
-});
-
-$("interestMode")?.addEventListener("change", () => {
-  if ($("interestMode").value === "none") {
-    $("interestRate").value = "0";
-  }
-});
 
 /* ============================= */
 /* Tips aleatorios */
