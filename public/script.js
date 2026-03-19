@@ -91,6 +91,7 @@ function clearOutputs() {
   $("graphResult").innerText = "";
   $("graphResult").classList.add("hidden");
   $("financialTipResult").innerText = "";
+  $("financialInstallmentsResult").innerText = "";
 }
 
 function formatMoney(value) {
@@ -136,6 +137,31 @@ function getTipDiscountPayload() {
     amount: parseNonNegativeNumber($("financialAmount").value, "el monto base"),
     percentage: parseNonNegativeNumber($("financialPercentage").value, "el porcentaje"),
     calculation_type: $("financialType").value,
+  };
+}
+
+function renderInstallmentsResult(data) {
+  return [
+    "Calculadora de cuotas",
+    `Precio base: $${formatMoney(data.base_price)}`,
+    `Anticipo: $${formatMoney(data.down_payment)}`,
+    `Monto financiado: $${formatMoney(data.financed_amount)}`,
+    `Recargo total: $${formatMoney(data.surcharge_amount)}`,
+    `Total financiado: $${formatMoney(data.total_financed)}`,
+    `Cantidad de cuotas: ${data.installments}`,
+    `Valor por cuota: $${formatMoney(data.installment_value)}`,
+  ].join("\n");
+}
+
+function getInstallmentsPayload() {
+  return {
+    mode: "financial",
+    financial_op: "installments",
+    price: parseNonNegativeNumber($("financialPrice").value, "el precio base"),
+    down_payment: parseNonNegativeNumber($("financialDownPayment").value, "el anticipo", { allowEmpty: true, defaultValue: 0 }),
+    installments: parseInt(parseNonNegativeNumber($("financialInstallments").value, "la cantidad de cuotas"), 10),
+    interest_mode: $("financialInterestMode").value,
+    interest_rate: parseNonNegativeNumber($("financialInterestRate").value, "el porcentaje de interés", { allowEmpty: true, defaultValue: 0 }),
   };
 }
 
@@ -442,6 +468,137 @@ function localFallbackTipDiscount(amount, percentage, calculationType) {
   };
 }
 
+function localFallbackInstallments(price, downPayment, installments, interestMode, interestRate) {
+  if (!Number.isFinite(price) || price < 0) {
+    throw new Error("Precio base inválido.");
+  }
+
+  if (!Number.isFinite(downPayment) || downPayment < 0) {
+    throw new Error("Anticipo inválido.");
+  }
+
+  if (!Number.isInteger(installments) || installments <= 0) {
+    throw new Error("La cantidad de cuotas debe ser mayor a 0.");
+  }
+
+  if (!Number.isFinite(interestRate) || interestRate < 0) {
+    throw new Error("Porcentaje de interés inválido.");
+  }
+
+  if (downPayment > price) {
+    throw new Error("El anticipo no puede ser mayor que el precio base.");
+  }
+
+  const normalizedMode = interestMode === "with_interest" ? "with_interest" : "none";
+  const financedAmount = price - downPayment;
+  const surchargeAmount = normalizedMode === "with_interest"
+    ? financedAmount * (interestRate / 100)
+    : 0;
+  const totalFinanced = financedAmount + surchargeAmount;
+  const installmentValue = totalFinanced / installments;
+
+  const resultData = {
+    base_price: price,
+    down_payment: downPayment,
+    financed_amount: financedAmount,
+    surcharge_amount: surchargeAmount,
+    total_financed: totalFinanced,
+    installments,
+    installment_value: installmentValue,
+    interest_mode: normalizedMode,
+    interest_rate: interestRate,
+  };
+
+  return {
+    result: renderInstallmentsResult(resultData),
+    ...resultData,
+  };
+}
+
+
+$("btn-financial-tip")?.addEventListener("click", calculateTipDiscount);
+$("btn-financial-tip-clear")?.addEventListener("click", () => {
+  $("financialAmount").value = "";
+  $("financialPercentage").value = "";
+  $("financialType").value = "tip";
+  $("financialTipResult").innerText = "";
+  setStatus("Listo.");
+});
+
+$("btn-financial-installments")?.addEventListener("click", calculateInstallments);
+$("btn-financial-installments-clear")?.addEventListener("click", () => {
+  $("financialPrice").value = "";
+  $("financialDownPayment").value = "0";
+  $("financialInstallments").value = "";
+  $("financialInterestMode").value = "none";
+  $("financialInterestRate").value = "0";
+  $("financialInstallmentsResult").innerText = "";
+  setStatus("Listo.");
+});
+
+async function calculateTipDiscount() {
+  setStatus("Calculando...");
+  setButtonLoading("btn-financial-tip", true, "Calculando...");
+
+  try {
+    const payload = getTipDiscountPayload();
+    const data = await postJSON("/api/calculate", payload);
+
+    if (data.error) throw new Error(data.error);
+
+    $("financialTipResult").innerText = renderTipDiscountResult(data);
+    setStatus("HECHO.");
+  } catch (error) {
+    try {
+      const payload = getTipDiscountPayload();
+      const fallback = localFallbackTipDiscount(
+        payload.amount,
+        payload.percentage,
+        payload.calculation_type
+      );
+      $("financialTipResult").innerText = fallback.result;
+      setStatus("API no disponible: cálculo local.");
+    } catch (fallbackError) {
+      $("financialTipResult").innerText = `❌ ${(error?.message || fallbackError?.message || "No se pudo calcular.")}`;
+      setStatus("Error.");
+    }
+  } finally {
+    setButtonLoading("btn-financial-tip", false);
+  }
+}
+
+async function calculateInstallments() {
+  setStatus("Calculando cuotas...");
+  setButtonLoading("btn-financial-installments", true, "Calculando...");
+
+  try {
+    const payload = getInstallmentsPayload();
+    const data = await postJSON("/api/calculate", payload);
+
+    if (data.error) throw new Error(data.error);
+
+    $("financialInstallmentsResult").innerText = renderInstallmentsResult(data);
+    setStatus("HECHO.");
+  } catch (error) {
+    try {
+      const payload = getInstallmentsPayload();
+      const fallback = localFallbackInstallments(
+        payload.price,
+        payload.down_payment,
+        payload.installments,
+        payload.interest_mode,
+        payload.interest_rate
+      );
+      $("financialInstallmentsResult").innerText = fallback.result;
+      setStatus("API no disponible: cálculo local.");
+    } catch (fallbackError) {
+      $("financialInstallmentsResult").innerText = `❌ ${(error?.message || fallbackError?.message || "No se pudo calcular.")}`;
+      setStatus("Error.");
+    }
+  } finally {
+    setButtonLoading("btn-financial-installments", false);
+  }
+}
 
 /* ============================= */
 /* Standard / Scientific */
@@ -792,50 +949,6 @@ $("btn-date-clear")?.addEventListener("click", () => {
   $("dResult").innerText = "";
   setStatus("Listo.");
 });
-
-/* ============================= */
-/* Financial */
-/* ============================= */
-
-$("btn-financial-tip")?.addEventListener("click", async () => {
-  const output = $("financialTipResult");
-
-  try {
-    const payload = getTipDiscountPayload();
-    setStatus("Calculando propina/descuento...");
-    setButtonLoading("btn-financial-tip", true, "Calculando...");
-
-    try {
-      const data = await postJSON("/api/calculate", payload);
-
-      if (data.error) {
-        output.innerText = `❌ ${data.error}`;
-        return setStatus("Error.");
-      }
-
-      output.innerText = `✅ ${data.result || renderTipDiscountResult(data)}`;
-      setStatus("HECHO.");
-    } catch {
-      const fallback = localFallbackTipDiscount(payload.amount, payload.percentage, payload.calculation_type);
-      output.innerText = `✅ ${fallback.result}`;
-      setStatus("API no disponible: cálculo local.");
-    }
-  } catch (error) {
-    output.innerText = `❌ ${error.message}`;
-    setStatus("Revisá los datos ingresados.");
-  } finally {
-    setButtonLoading("btn-financial-tip", false);
-  }
-});
-
-$("btn-financial-tip-clear")?.addEventListener("click", () => {
-  $("financialAmount").value = "";
-  $("financialType").value = "tip";
-  $("financialPercentage").value = "";
-  $("financialTipResult").innerText = "";
-  setStatus("Listo.");
-});
-
 
 /* ============================= */
 /* Tips aleatorios */

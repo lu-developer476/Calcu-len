@@ -293,7 +293,7 @@ class CalcRequest(BaseModel):
     down_payment: Optional[float] = None
     installments: Optional[int] = None
     interest_rate: Optional[float] = None
-    interest_mode: Optional[str] = None
+    interest_mode: Optional[Literal["none", "with_interest"]] = None
 
     @field_validator("amount", "percentage", "price", "down_payment", "interest_rate")
     @classmethod
@@ -323,6 +323,12 @@ class CalcRequest(BaseModel):
                 raise ValueError("Falta price")
             if self.installments is None:
                 raise ValueError("Falta installments")
+            if self.interest_mode is None:
+                self.interest_mode = "none"
+            if self.down_payment is None:
+                self.down_payment = 0
+            if self.interest_rate is None:
+                self.interest_rate = 0
 
         return self
 
@@ -413,21 +419,23 @@ def _calculate_installments(
 
     normalized_mode = "with_interest" if interest_mode == "with_interest" else "none"
     financed_amount = round(price - down_payment, 2)
-    total_financed = round(
-        financed_amount * (1 + (interest_rate / 100))
-        if normalized_mode == "with_interest"
-        else financed_amount,
+    surcharge_amount = round(
+        financed_amount * (interest_rate / 100) if normalized_mode == "with_interest" else 0,
         2,
     )
-    surcharge_amount = round(total_financed - financed_amount, 2)
+    total_financed = round(financed_amount + surcharge_amount, 2)
     installment_value = round(total_financed / installments, 2)
 
     return {
         "result": (
-            f"Monto financiado: ${financed_amount:.2f} • "
-            f"Recargo total: ${surcharge_amount:.2f} • "
-            f"Total financiado: ${total_financed:.2f} • "
-            f"{installments} cuota(s) de ${installment_value:.2f}"
+            "Calculadora de cuotas\n"
+            f"Precio base: ${price:.2f}\n"
+            f"Anticipo: ${down_payment:.2f}\n"
+            f"Monto financiado: ${financed_amount:.2f}\n"
+            f"Recargo total: ${surcharge_amount:.2f}\n"
+            f"Total financiado: ${total_financed:.2f}\n"
+            f"Cantidad de cuotas: {installments}\n"
+            f"Valor por cuota: ${installment_value:.2f}"
         ),
         "base_price": price,
         "down_payment": down_payment,
@@ -436,6 +444,8 @@ def _calculate_installments(
         "total_financed": total_financed,
         "installment_value": installment_value,
         "installments": installments,
+        "interest_mode": normalized_mode,
+        "interest_rate": interest_rate,
     }
 
 

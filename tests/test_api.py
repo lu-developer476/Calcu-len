@@ -160,3 +160,89 @@ def test_financial_tip_discount_validation_errors():
         },
     )
     assert invalid_amount.status_code == 422
+
+
+def test_financial_installments_without_interest():
+    response = client.post(
+        "/api/calculate",
+        json={
+            "mode": "financial",
+            "financial_op": "installments",
+            "price": 120000,
+            "down_payment": 20000,
+            "installments": 10,
+            "interest_mode": "none",
+            "interest_rate": 0,
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["base_price"] == 120000
+    assert data["down_payment"] == 20000
+    assert data["financed_amount"] == 100000
+    assert data["surcharge_amount"] == 0
+    assert data["total_financed"] == 100000
+    assert data["installments"] == 10
+    assert data["installment_value"] == 10000
+
+
+def test_financial_installments_with_interest():
+    response = client.post(
+        "/api/calculate",
+        json={
+            "mode": "financial",
+            "financial_op": "installments",
+            "price": 100000,
+            "down_payment": 10000,
+            "installments": 9,
+            "interest_mode": "with_interest",
+            "interest_rate": 18,
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["base_price"] == 100000
+    assert data["down_payment"] == 10000
+    assert data["financed_amount"] == 90000
+    assert data["surcharge_amount"] == 16200
+    assert data["total_financed"] == 106200
+    assert data["installments"] == 9
+    assert data["installment_value"] == 11800
+
+
+def test_financial_installments_rejects_down_payment_over_price():
+    response = client.post(
+        "/api/calculate",
+        json={
+            "mode": "financial",
+            "financial_op": "installments",
+            "price": 50000,
+            "down_payment": 60000,
+            "installments": 6,
+            "interest_mode": "none",
+            "interest_rate": 0,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["error"] == "El anticipo no puede ser mayor que el precio base"
+
+
+def test_financial_installments_rejects_invalid_installments():
+    response = client.post(
+        "/api/calculate",
+        json={
+            "mode": "financial",
+            "financial_op": "installments",
+            "price": 50000,
+            "down_payment": 5000,
+            "installments": 0,
+            "interest_mode": "with_interest",
+            "interest_rate": 12,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["error"] == "La cantidad de cuotas debe ser mayor a 0"
