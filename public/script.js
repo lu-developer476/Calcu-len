@@ -10,6 +10,7 @@ const panels = {
   graph: $("panel-graph"),
   programmer: $("panel-programmer"),
   date: $("panel-date"),
+  financial: $("panel-financial"),
 };
 
 let currentMode = "standard";
@@ -62,10 +63,10 @@ function setTitle(mode) {
     graph: "Gráfica",
     programmer: "Programadora",
     date: "Cálculo de fechas",
+    financial: "Financiera",
   };
   $("title").innerText = titles[mode] ?? mode;
 }
-
 
 function toggleScientificControls(isScientific) {
   const controls = $("scientific-angle-controls");
@@ -74,7 +75,7 @@ function toggleScientificControls(isScientific) {
 }
 
 function showPanel(mode) {
-  Object.values(panels).forEach(p => p?.classList.add("hidden"));
+  Object.values(panels).forEach((panel) => panel?.classList.add("hidden"));
 
   if (mode === "standard" || mode === "scientific") {
     $("panel-expression").classList.remove("hidden");
@@ -87,6 +88,104 @@ function clearOutputs() {
   $("result").innerText = "";
   $("pResult").innerText = "";
   $("dResult").innerText = "";
+  $("graphResult").innerText = "";
+  $("graphResult").classList.add("hidden");
+  $("financialTipResult").innerText = "";
+  $("financialInstallmentsResult").innerText = "";
+}
+
+function formatMoney(value) {
+  return Number(value).toFixed(2);
+}
+
+function parseNonNegativeNumber(rawValue, label, { allowEmpty = false, defaultValue = null } = {}) {
+  const value = String(rawValue ?? "").trim();
+
+  if (!value) {
+    if (allowEmpty) return defaultValue;
+    throw new Error(`Completá ${label}.`);
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${label} inválido.`);
+  }
+
+  if (parsed < 0) {
+    throw new Error(`${label} no puede ser negativo.`);
+  }
+
+  return parsed;
+}
+
+function parsePositiveInteger(rawValue, label) {
+  const parsed = Number(String(rawValue ?? "").trim());
+
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${label} debe ser un entero mayor a 0.`);
+  }
+
+  return parsed;
+}
+
+function renderTipDiscountResult(data) {
+  const typeLabel = data.calculation_type === "discount" ? "Descuento" : "Propina";
+  return [
+    `${typeLabel}: $${formatMoney(data.calculated_amount)}`,
+    `Monto base: $${formatMoney(data.base_amount)}`,
+    `Total final: $${formatMoney(data.total)}`,
+  ].join(" • ");
+}
+
+function renderInstallmentsResult(data) {
+  return [
+    `Monto financiado: $${formatMoney(data.financed_amount)}`,
+    `Recargo total: $${formatMoney(data.surcharge_amount)}`,
+    `Total financiado: $${formatMoney(data.total_financed)}`,
+    `${data.installments} cuota(s) de $${formatMoney(data.installment_value)}`,
+  ].join(" • ");
+}
+
+function getTipDiscountPayload() {
+  return {
+    mode: "financial",
+    financial_op: "tip_discount",
+    amount: parseNonNegativeNumber($("financialAmount").value, "el monto base"),
+    percentage: parseNonNegativeNumber($("financialPercentage").value, "el porcentaje"),
+    calculation_type: $("financialType").value,
+  };
+}
+
+function getInstallmentsPayload() {
+  const price = parseNonNegativeNumber($("installmentPrice").value, "el precio base");
+  const downPayment = parseNonNegativeNumber($("installmentDownPayment").value, "el anticipo", {
+    allowEmpty: true,
+    defaultValue: 0,
+  });
+  const installments = parsePositiveInteger($("installmentCount").value, "La cantidad de cuotas");
+  const interestMode = $("interestMode").value;
+  const interestRate = parseNonNegativeNumber($("interestRate").value, "el interés", {
+    allowEmpty: true,
+    defaultValue: 0,
+  });
+
+  if (downPayment > price) {
+    throw new Error("El anticipo no puede ser mayor que el precio base.");
+  }
+
+  if (interestMode === "none" && interestRate !== 0) {
+    $("interestRate").value = "0";
+  }
+
+  return {
+    mode: "financial",
+    financial_op: "installments",
+    price,
+    down_payment: downPayment,
+    installments,
+    interest_rate: interestMode === "none" ? 0 : interestRate,
+    interest_mode: interestMode,
+  };
 }
 
 /* ============================= */
@@ -99,12 +198,13 @@ if (menuToggle) {
   });
 }
 
-// cerrar sidebar en mobile al hacer click fuera
 document.addEventListener("click", (e) => {
-  if (window.innerWidth < 1240 &&
-      sidebar.classList.contains("open") &&
-      !sidebar.contains(e.target) &&
-      e.target !== menuToggle) {
+  if (
+    window.innerWidth < 1240 &&
+    sidebar.classList.contains("open") &&
+    !sidebar.contains(e.target) &&
+    e.target !== menuToggle
+  ) {
     sidebar.classList.remove("open");
   }
 });
@@ -113,9 +213,9 @@ document.addEventListener("click", (e) => {
 /* Tab Navigation */
 /* ============================= */
 
-tabs.forEach(btn => {
+tabs.forEach((btn) => {
   btn.addEventListener("click", () => {
-    tabs.forEach(b => b.classList.remove("active"));
+    tabs.forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
 
     currentMode = btn.dataset.mode;
@@ -125,7 +225,6 @@ tabs.forEach(btn => {
     clearOutputs();
     setStatus("Listo.");
 
-    // cerrar sidebar en mobile después de seleccionar
     if (window.innerWidth < 1240) {
       sidebar.classList.remove("open");
     }
@@ -216,7 +315,7 @@ async function setApiAngleMode(mode) {
 
   const candidates = [
     `/api/angle-mode?mode=${encodeURIComponent(normalized)}`,
-    `/api/index.py/angle-mode?mode=${encodeURIComponent(normalized)}`
+    `/api/index.py/angle-mode?mode=${encodeURIComponent(normalized)}`,
   ];
 
   let lastError = new Error("No se pudo actualizar el modo angular.");
@@ -242,7 +341,6 @@ async function setApiAngleMode(mode) {
 
   throw lastError;
 }
-
 
 function toLocalMathExpression(expr) {
   return normalizeExpression(expr)
@@ -346,8 +444,8 @@ function localFallbackProgrammer(op, number, base, other) {
 }
 
 function localFallbackDate(dateOp, date1, date2, days) {
-  const d1 = date1 ? new Date(date1 + "T00:00:00") : null;
-  const d2 = date2 ? new Date(date2 + "T00:00:00") : null;
+  const d1 = date1 ? new Date(`${date1}T00:00:00`) : null;
+  const d2 = date2 ? new Date(`${date2}T00:00:00`) : null;
 
   if (dateOp === "diff") {
     if (!d1 || !d2) throw new Error("Faltan fechas");
@@ -363,6 +461,82 @@ function localFallbackDate(dateOp, date1, date2, days) {
   throw new Error("Operación de fecha inválida");
 }
 
+function localFallbackTipDiscount(amount, percentage, calculationType) {
+  if (!Number.isFinite(amount) || amount < 0) {
+    throw new Error("Monto base inválido.");
+  }
+
+  if (!Number.isFinite(percentage) || percentage < 0) {
+    throw new Error("Porcentaje inválido.");
+  }
+
+  const normalizedType = calculationType === "discount" ? "discount" : "tip";
+  const calculatedAmount = amount * (percentage / 100);
+  const total = normalizedType === "discount"
+    ? amount - calculatedAmount
+    : amount + calculatedAmount;
+
+  return {
+    result: renderTipDiscountResult({
+      base_amount: amount,
+      calculated_amount: calculatedAmount,
+      total,
+      calculation_type: normalizedType,
+    }),
+    base_amount: amount,
+    calculated_amount: calculatedAmount,
+    total,
+    calculation_type: normalizedType,
+  };
+}
+
+function localFallbackInstallments(price, downPayment, installments, interestRate, interestMode) {
+  if (!Number.isFinite(price) || price < 0) {
+    throw new Error("Precio base inválido.");
+  }
+
+  if (!Number.isFinite(downPayment) || downPayment < 0) {
+    throw new Error("Anticipo inválido.");
+  }
+
+  if (!Number.isInteger(installments) || installments <= 0) {
+    throw new Error("La cantidad de cuotas debe ser mayor a 0.");
+  }
+
+  if (!Number.isFinite(interestRate) || interestRate < 0) {
+    throw new Error("Interés inválido.");
+  }
+
+  if (downPayment > price) {
+    throw new Error("El anticipo no puede ser mayor que el precio base.");
+  }
+
+  const normalizedMode = interestMode === "with_interest" ? "with_interest" : "none";
+  const financedAmount = price - downPayment;
+  const totalFinanced = normalizedMode === "with_interest"
+    ? financedAmount * (1 + interestRate / 100)
+    : financedAmount;
+  const surchargeAmount = totalFinanced - financedAmount;
+  const installmentValue = totalFinanced / installments;
+
+  return {
+    result: renderInstallmentsResult({
+      financed_amount: financedAmount,
+      surcharge_amount: surchargeAmount,
+      total_financed: totalFinanced,
+      installment_value: installmentValue,
+      installments,
+    }),
+    base_price: price,
+    down_payment: downPayment,
+    financed_amount: financedAmount,
+    surcharge_amount: surchargeAmount,
+    total_financed: totalFinanced,
+    installment_value: installmentValue,
+    installments,
+  };
+}
+
 /* ============================= */
 /* Standard / Scientific */
 /* ============================= */
@@ -374,7 +548,6 @@ $("btn-clear")?.addEventListener("click", () => {
   setStatus("Listo.");
 });
 
-// Enter para calcular
 $("expression")?.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     calculateExpression();
@@ -399,21 +572,20 @@ async function calculateExpression() {
     });
 
     if (data.error) {
-      $("result").innerText = "❌ " + data.error;
+      $("result").innerText = `❌ ${data.error}`;
       return setStatus("Error.");
     }
 
-    $("result").innerText = "✅ " + data.result;
+    $("result").innerText = `✅ ${data.result}`;
     setStatus("HECHO.");
-
   } catch {
     try {
       const fallback = localFallbackCalculate(
         currentMode,
         normalizeExpression(expr),
-        currentMode === "scientific" ? ($("angleMode")?.value || currentAngleMode) : "RAD"
+        currentMode === "scientific" ? $("angleMode")?.value || currentAngleMode : "RAD"
       );
-      $("result").innerText = "✅ " + fallback;
+      $("result").innerText = `✅ ${fallback}`;
       setStatus("API no disponible: cálculo local.");
     } catch {
       $("result").innerText = "❌ No se pudo conectar con la API.";
@@ -438,7 +610,6 @@ function destroyChart() {
 }
 
 $("btn-plot")?.addEventListener("click", async () => {
-
   const rawInput = $("graphExpression").value.trim();
   const graphResult = $("graphResult");
 
@@ -468,33 +639,27 @@ $("btn-plot")?.addEventListener("click", async () => {
   setButtonLoading("btn-plot", true, "Graficando...");
 
   try {
-
     const data = await postJSON("/api/graph", {
       expressions,
       x_min,
       x_max,
-      samples
+      samples,
     });
 
     if (data.error) {
       graphResult.classList.remove("hidden");
-      graphResult.innerText = "❌ " + data.error;
+      graphResult.innerText = `❌ ${data.error}`;
       return setStatus("Error.");
     }
 
     destroyChart();
 
     const ctx = $("chart").getContext("2d");
-
     const datasets = [];
 
     data.datasets.forEach((set) => {
-
       const points = set.x
-        .map((xVal, i) => ({
-          x: xVal,
-          y: set.y[i]
-        }))
+        .map((xVal, i) => ({ x: xVal, y: set.y[i] }))
         .filter((point) => point.y !== null && Number.isFinite(point.y));
 
       if (points.length === 0) {
@@ -509,20 +674,17 @@ $("btn-plot")?.addEventListener("click", async () => {
         borderWidth: 2,
         pointRadius: 0,
         tension: 0.2,
-        fill: false
+        fill: false,
       });
 
-      // Si es integral, sombrear área
       if (isIntegral) {
-
         const match = set.expression.match(/int\((.*?),(.*?),(.*?)\)/);
 
         if (match) {
           const exprBase = match[1].trim();
           const a = parseFloat(match[2]);
           const b = parseFloat(match[3]);
-
-          const areaPoints = points.filter(p => p.x >= a && p.x <= b);
+          const areaPoints = points.filter((point) => point.x >= a && point.x <= b);
 
           datasets.push({
             label: `Área ∫ ${exprBase}`,
@@ -530,11 +692,10 @@ $("btn-plot")?.addEventListener("click", async () => {
             borderWidth: 0,
             pointRadius: 0,
             fill: true,
-            backgroundColor: "rgba(96,165,250,0.25)"
+            backgroundColor: "rgba(96,165,250,0.25)",
           });
         }
       }
-
     });
 
     if (!datasets.length) {
@@ -551,20 +712,13 @@ $("btn-plot")?.addEventListener("click", async () => {
         maintainAspectRatio: false,
         parsing: false,
         scales: {
-          x: {
-            type: "linear",
-            min: x_min,
-            max: x_max
-          },
-          y: {
-            type: "linear"
-          }
-        }
-      }
+          x: { type: "linear", min: x_min, max: x_max },
+          y: { type: "linear" },
+        },
+      },
     });
 
     setStatus("HECHO.");
-
   } catch {
     try {
       const fallbackDatasets = localFallbackGraph(expressions, x_min, x_max, samples, currentAngleMode);
@@ -636,16 +790,15 @@ $("btn-to-base")?.addEventListener("click", async () => {
       mode: "programmer",
       op: "to_base",
       number,
-      base
+      base,
     });
 
-    $("pResult").innerText = data.error ? "❌ " + data.error : "✅ " + data.result;
+    $("pResult").innerText = data.error ? `❌ ${data.error}` : `✅ ${data.result}`;
     setStatus(data.error ? "Error." : "HECHO.");
-
   } catch (error) {
     try {
       const value = localFallbackProgrammer("to_base", number, base, null);
-      $("pResult").innerText = "✅ " + value;
+      $("pResult").innerText = `✅ ${value}`;
       setStatus("HECHO.");
     } catch {
       $("pResult").innerText = `❌ ${error.message || "No se pudo conectar con la API."}`;
@@ -667,13 +820,12 @@ $("btn-bitwise")?.addEventListener("click", async () => {
   try {
     const data = await postJSON("/api/calculate", payload);
 
-    $("pResult").innerText = data.error ? "❌ " + data.error : "✅ " + data.result;
+    $("pResult").innerText = data.error ? `❌ ${data.error}` : `✅ ${data.result}`;
     setStatus(data.error ? "Error." : "HECHO.");
-
   } catch (error) {
     try {
       const value = localFallbackProgrammer(op, number, null, other);
-      $("pResult").innerText = "✅ " + value;
+      $("pResult").innerText = `✅ ${value}`;
       setStatus("HECHO.");
     } catch {
       $("pResult").innerText = `❌ ${error.message || "No se pudo conectar con la API."}`;
@@ -713,16 +865,15 @@ $("btn-date")?.addEventListener("click", async () => {
       date_op,
       date1,
       date2,
-      days: Number.isNaN(days) ? null : days
+      days: Number.isNaN(days) ? null : days,
     });
 
-    $("dResult").innerText = data.error ? "❌ " + data.error : "✅ " + data.result;
+    $("dResult").innerText = data.error ? `❌ ${data.error}` : `✅ ${data.result}`;
     setStatus(data.error ? "Error." : "HECHO.");
-
   } catch (error) {
     try {
       const value = localFallbackDate(date_op, date1, date2, days);
-      $("dResult").innerText = "✅ " + value;
+      $("dResult").innerText = `✅ ${value}`;
       setStatus("HECHO.");
     } catch {
       $("dResult").innerText = `❌ ${error.message || "No se pudo conectar con la API."}`;
@@ -737,36 +888,132 @@ $("btn-date-clear")?.addEventListener("click", () => {
 });
 
 /* ============================= */
+/* Financial */
+/* ============================= */
+
+$("btn-financial-tip")?.addEventListener("click", async () => {
+  const output = $("financialTipResult");
+
+  try {
+    const payload = getTipDiscountPayload();
+    setStatus("Calculando propina/descuento...");
+    setButtonLoading("btn-financial-tip", true, "Calculando...");
+
+    try {
+      const data = await postJSON("/api/calculate", payload);
+
+      if (data.error) {
+        output.innerText = `❌ ${data.error}`;
+        return setStatus("Error.");
+      }
+
+      output.innerText = `✅ ${data.result || renderTipDiscountResult(data)}`;
+      setStatus("HECHO.");
+    } catch {
+      const fallback = localFallbackTipDiscount(payload.amount, payload.percentage, payload.calculation_type);
+      output.innerText = `✅ ${fallback.result}`;
+      setStatus("API no disponible: cálculo local.");
+    }
+  } catch (error) {
+    output.innerText = `❌ ${error.message}`;
+    setStatus("Revisá los datos ingresados.");
+  } finally {
+    setButtonLoading("btn-financial-tip", false);
+  }
+});
+
+$("btn-financial-tip-clear")?.addEventListener("click", () => {
+  $("financialAmount").value = "";
+  $("financialType").value = "tip";
+  $("financialPercentage").value = "";
+  $("financialTipResult").innerText = "";
+  setStatus("Listo.");
+});
+
+$("btn-installments")?.addEventListener("click", async () => {
+  const output = $("financialInstallmentsResult");
+
+  try {
+    const payload = getInstallmentsPayload();
+    setStatus("Calculando cuotas...");
+    setButtonLoading("btn-installments", true, "Calculando...");
+
+    try {
+      const data = await postJSON("/api/calculate", payload);
+
+      if (data.error) {
+        output.innerText = `❌ ${data.error}`;
+        return setStatus("Error.");
+      }
+
+      output.innerText = `✅ ${data.result || renderInstallmentsResult(data)}`;
+      setStatus("HECHO.");
+    } catch {
+      const fallback = localFallbackInstallments(
+        payload.price,
+        payload.down_payment,
+        payload.installments,
+        payload.interest_rate,
+        payload.interest_mode
+      );
+      output.innerText = `✅ ${fallback.result}`;
+      setStatus("API no disponible: cálculo local.");
+    }
+  } catch (error) {
+    output.innerText = `❌ ${error.message}`;
+    setStatus("Revisá los datos ingresados.");
+  } finally {
+    setButtonLoading("btn-installments", false);
+  }
+});
+
+$("btn-installments-clear")?.addEventListener("click", () => {
+  $("installmentPrice").value = "";
+  $("installmentDownPayment").value = "0";
+  $("installmentCount").value = "";
+  $("interestMode").value = "none";
+  $("interestRate").value = "0";
+  $("financialInstallmentsResult").innerText = "";
+  setStatus("Listo.");
+});
+
+$("interestMode")?.addEventListener("change", () => {
+  if ($("interestMode").value === "none") {
+    $("interestRate").value = "0";
+  }
+});
+
+/* ============================= */
 /* Tips aleatorios */
 /* ============================= */
 
 const tipsList = [
-"Multiplicar por 10 → agregar un cero.",
-"Multiplicar por 5 → multiplicar por 10 y dividir por 2.",
-"Dividir por 0 no está definido.",
-"Todo número multiplicado por 0 da 0.",
-"Todo número elevado a 0 (≠0) da 1.",
-"El cuadrado de un número negativo es positivo.",
-"(a + b)² = a² + 2ab + b².",
-"(a − b)² = a² − 2ab + b².",
-"(a + b)(a − b) = a² − b².",
-"1% de un número = dividir por 100.",
-"10% de un número = mover la coma un lugar.",
-"Para calcular 15%, sumá 10% + 5%.",
-"Si ax = b → x = b/a.",
-"Despejar es aislar la variable.",
-"Una función lineal tiene forma f(x)=mx+b.",
-"sin²(x)+cos²(x)=1.",
-"√(a²)=|a|.",
-"log(a·b)=log(a)+log(b).",
-"log(a/b)=log(a)-log(b).",
-"ln(e)=1.",
-"Multiplicar por 9 → multiplicar por 10 y restar el número.",
-"25% es la cuarta parte de un entero.",
-"50% es la mitad de un entero.",
-"75% son las 3/4 partes de un entero.",
-"Siempre estimá antes de validar un resultado.",
-"Siempre simplificá antes de operar."
+  "Multiplicar por 10 → agregar un cero.",
+  "Multiplicar por 5 → multiplicar por 10 y dividir por 2.",
+  "Dividir por 0 no está definido.",
+  "Todo número multiplicado por 0 da 0.",
+  "Todo número elevado a 0 (≠0) da 1.",
+  "El cuadrado de un número negativo es positivo.",
+  "(a + b)² = a² + 2ab + b².",
+  "(a − b)² = a² − 2ab + b².",
+  "(a + b)(a − b) = a² − b².",
+  "1% de un número = dividir por 100.",
+  "10% de un número = mover la coma un lugar.",
+  "Para calcular 15%, sumá 10% + 5%.",
+  "Si ax = b → x = b/a.",
+  "Despejar es aislar la variable.",
+  "Una función lineal tiene forma f(x)=mx+b.",
+  "sin²(x)+cos²(x)=1.",
+  "√(a²)=|a|.",
+  "log(a·b)=log(a)+log(b).",
+  "log(a/b)=log(a)-log(b).",
+  "ln(e)=1.",
+  "Multiplicar por 9 → multiplicar por 10 y restar el número.",
+  "25% es la cuarta parte de un entero.",
+  "50% es la mitad de un entero.",
+  "75% son las 3/4 partes de un entero.",
+  "Siempre estimá antes de validar un resultado.",
+  "Siempre simplificá antes de operar.",
 ];
 
 const tipText = document.getElementById("tipText");
@@ -774,21 +1021,20 @@ const newTipBtn = document.getElementById("newTipBtn");
 const tipsToggle = document.getElementById("tipsToggle");
 const tipsContent = document.getElementById("tipsContent");
 
-function getRandomTip(){
+function getRandomTip() {
   return tipsList[Math.floor(Math.random() * tipsList.length)];
 }
 
-function showNewTip(){
+function showNewTip() {
   tipText.innerText = getRandomTip();
 }
 
 if (tipsToggle) {
   tipsToggle.addEventListener("click", () => {
     tipsContent.classList.toggle("hidden");
-    tipsToggle.innerText =
-      tipsContent.classList.contains("hidden")
-        ? "Tips rápidos ▶"
-        : "Tips rápidos ▼";
+    tipsToggle.innerText = tipsContent.classList.contains("hidden")
+      ? "Tips rápidos ▶"
+      : "Tips rápidos ▼";
 
     if (!tipsContent.classList.contains("hidden")) {
       showNewTip();
@@ -806,12 +1052,11 @@ $("graphExpression")?.addEventListener("keydown", (e) => {
   }
 });
 
-
 $("angleMode")?.addEventListener("change", async () => {
   try {
     await setApiAngleMode($("angleMode").value);
     setStatus(`Modo angular: ${currentAngleMode}`);
-  } catch (error) {
+  } catch {
     setStatus("No se pudo actualizar DEG/RAD.");
   }
 });
