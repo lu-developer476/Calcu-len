@@ -10,7 +10,7 @@ import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from threading import Lock
-from typing import Any, Deque, Dict, List, Optional, Tuple, Union
+from typing import Any, Deque, Dict, List, Literal, Optional, Tuple, Union
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
@@ -275,7 +275,7 @@ def safe_eval(expr: str, variables: Optional[Dict[str, Union[float, complex]]] =
 
 
 class CalcRequest(BaseModel):
-    mode: str = Field(..., description="standard | scientific | programmer | date | financial")
+    mode: Literal["standard", "scientific", "programmer", "date", "financial"]
     expression: Optional[str] = None
     number: Optional[int] = None
     base: Optional[int] = Field(default=None, description="2, 8, 10, 16")
@@ -285,24 +285,46 @@ class CalcRequest(BaseModel):
     date2: Optional[str] = None
     days: Optional[int] = None
     date_op: Optional[str] = None
-    financial_op: Optional[str] = None
+    financial_op: Optional[Literal["tip_discount", "installments"]] = None
     amount: Optional[float] = None
     percentage: Optional[float] = None
-    calculation_type: Optional[str] = None
+    calculation_type: Optional[Literal["tip", "discount"]] = None
     price: Optional[float] = None
     down_payment: Optional[float] = None
     installments: Optional[int] = None
     interest_rate: Optional[float] = None
     interest_mode: Optional[str] = None
 
-    @field_validator("mode")
+    @field_validator("amount", "percentage", "price", "down_payment", "interest_rate")
     @classmethod
-    def validate_mode(cls, value: str) -> str:
-        valid_modes = {"standard", "scientific", "programmer", "date", "financial"}
-        mode = value.strip().lower()
-        if mode not in valid_modes:
-            raise ValueError("Modo inválido")
-        return mode
+    def validate_non_negative_numbers(cls, value: Optional[float]) -> Optional[float]:
+        if value is None:
+            return value
+        numeric_value = float(value)
+        if numeric_value < 0:
+            raise ValueError("El valor no puede ser negativo")
+        return numeric_value
+
+    @model_validator(mode="after")
+    def validate_financial_payload(self) -> "CalcRequest":
+        if self.mode != "financial":
+            return self
+
+        if self.financial_op == "tip_discount":
+            if self.amount is None:
+                raise ValueError("Falta amount")
+            if self.percentage is None:
+                raise ValueError("Falta percentage")
+            if self.calculation_type is None:
+                raise ValueError("Falta calculation_type")
+
+        if self.financial_op == "installments":
+            if self.price is None:
+                raise ValueError("Falta price")
+            if self.installments is None:
+                raise ValueError("Falta installments")
+
+        return self
 
 
 class GraphRequest(BaseModel):
@@ -354,17 +376,23 @@ def _ensure_non_negative(value: Optional[float], field_name: str) -> float:
 
 def _calculate_tip_discount(amount: float, percentage: float, calculation_type: str) -> Dict[str, Any]:
     normalized_type = "discount" if calculation_type == "discount" else "tip"
-    calculated_amount = amount * (percentage / 100)
-    total = amount - calculated_amount if normalized_type == "discount" else amount + calculated_amount
+    calculated_amount = round(amount * (percentage / 100), 2)
+    total = round(
+        amount - calculated_amount if normalized_type == "discount" else amount + calculated_amount,
+        2,
+    )
     label = "Descuento" if normalized_type == "discount" else "Propina"
 
     return {
         "result": (
-            f"{label}: ${calculated_amount:.2f} • "
-            f"Monto base: ${amount:.2f} • "
+            f"{label} aplicado\n"
+            f"Monto base: ${amount:.2f}\n"
+            f"Porcentaje: {percentage:.2f}%\n"
+            f"Monto calculado: ${calculated_amount:.2f}\n"
             f"Total final: ${total:.2f}"
         ),
         "base_amount": amount,
+        "percentage": percentage,
         "calculated_amount": calculated_amount,
         "total": total,
         "calculation_type": normalized_type,

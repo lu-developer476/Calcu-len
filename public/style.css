@@ -375,7 +375,8 @@ input[type="date"]{
   color:var(--text);
 }
 
-#panel-financial .result{
-  white-space:normal;
-  line-height:1.5;
+.result-financial{
+  white-space:pre-line;
+  line-height:1.6;
+  align-items:flex-start;
 }

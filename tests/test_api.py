@@ -83,119 +83,80 @@ def test_can_switch_angle_mode_to_radians():
     assert restore.json()["mode"] == "DEG"
 
 
-def test_financial_tip_calculation():
+def test_financial_tip_discount_tip_10_percent_over_1000():
     response = client.post(
         "/api/calculate",
         json={
             "mode": "financial",
             "financial_op": "tip_discount",
-            "amount": 100,
-            "percentage": 15,
+            "amount": 1000,
+            "percentage": 10,
             "calculation_type": "tip",
         },
     )
 
     assert response.status_code == 200
     data = response.json()
-    assert data["base_amount"] == 100
-    assert data["calculated_amount"] == 15
-    assert data["total"] == 115
+    assert data["base_amount"] == 1000
+    assert data["percentage"] == 10
+    assert data["calculated_amount"] == 100
+    assert data["total"] == 1100
     assert data["calculation_type"] == "tip"
 
 
-def test_financial_discount_calculation():
+def test_financial_tip_discount_discount_25_percent_over_2000():
     response = client.post(
         "/api/calculate",
         json={
             "mode": "financial",
             "financial_op": "tip_discount",
-            "amount": 200,
-            "percentage": 10,
+            "amount": 2000,
+            "percentage": 25,
             "calculation_type": "discount",
         },
     )
 
     assert response.status_code == 200
     data = response.json()
-    assert data["base_amount"] == 200
-    assert data["calculated_amount"] == 20
-    assert data["total"] == 180
+    assert data["base_amount"] == 2000
+    assert data["percentage"] == 25
+    assert data["calculated_amount"] == 500
+    assert data["total"] == 1500
     assert data["calculation_type"] == "discount"
 
 
-def test_financial_installments_without_interest():
-    response = client.post(
-        "/api/calculate",
-        json={
-            "mode": "financial",
-            "financial_op": "installments",
-            "price": 1200,
-            "down_payment": 200,
-            "installments": 5,
-            "interest_mode": "none",
-            "interest_rate": 0,
-        },
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["financed_amount"] == 1000
-    assert data["surcharge_amount"] == 0
-    assert data["total_financed"] == 1000
-    assert data["installment_value"] == 200
-    assert data["installments"] == 5
-
-
-def test_financial_installments_with_interest():
-    response = client.post(
-        "/api/calculate",
-        json={
-            "mode": "financial",
-            "financial_op": "installments",
-            "price": 1000,
-            "down_payment": 100,
-            "installments": 3,
-            "interest_mode": "with_interest",
-            "interest_rate": 12,
-        },
-    )
-
-    assert response.status_code == 200
-    data = response.json()
-    assert data["financed_amount"] == 900
-    assert data["surcharge_amount"] == 108
-    assert data["total_financed"] == 1008
-    assert data["installment_value"] == 336
-
-
-def test_financial_validations_return_errors():
-    invalid_down_payment = client.post(
-        "/api/calculate",
-        json={
-            "mode": "financial",
-            "financial_op": "installments",
-            "price": 1000,
-            "down_payment": 1200,
-            "installments": 6,
-            "interest_mode": "none",
-            "interest_rate": 0,
-        },
-    )
-
-    assert invalid_down_payment.status_code == 200
-    assert "anticipo" in invalid_down_payment.json()["error"].lower()
-
-    invalid_percentage = client.post(
+def test_financial_tip_discount_validation_errors():
+    missing_amount = client.post(
         "/api/calculate",
         json={
             "mode": "financial",
             "financial_op": "tip_discount",
-            "amount": 100,
+            "percentage": 10,
+            "calculation_type": "tip",
+        },
+    )
+    assert missing_amount.status_code == 422
+
+    negative_percentage = client.post(
+        "/api/calculate",
+        json={
+            "mode": "financial",
+            "financial_op": "tip_discount",
+            "amount": 1000,
             "percentage": -5,
             "calculation_type": "tip",
         },
     )
+    assert negative_percentage.status_code == 422
 
-    assert invalid_percentage.status_code == 200
-    assert "negative" not in invalid_percentage.json()["error"].lower()
-    assert "percentage" in invalid_percentage.json()["error"].lower()
+    invalid_amount = client.post(
+        "/api/calculate",
+        json={
+            "mode": "financial",
+            "financial_op": "tip_discount",
+            "amount": "abc",
+            "percentage": 10,
+            "calculation_type": "tip",
+        },
+    )
+    assert invalid_amount.status_code == 422

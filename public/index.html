@@ -199,7 +199,7 @@
       <!-- Financial -->
       <section class="panel hidden" id="panel-financial">
         <div class="financial-section">
-          <h2 class="financial-heading">Propinas y descuentos</h2>
+          <h2 class="financial-heading">Propinas / Descuentos</h2>
           <div class="grid2">
             <div>
               <label class="label" for="financialAmount">Monto base</label>
@@ -221,43 +221,7 @@
             <button class="btn primary" id="btn-financial-tip">Calcular</button>
             <button class="btn" id="btn-financial-tip-clear">Limpiar</button>
           </div>
-          <div class="result" id="financialTipResult"></div>
-        </div>
-
-        <hr class="sep" />
-
-        <div class="financial-section">
-          <h2 class="financial-heading">Calculadora de cuotas</h2>
-          <div class="grid2">
-            <div>
-              <label class="label" for="installmentPrice">Precio base</label>
-              <input id="installmentPrice" class="input" type="number" min="0" step="0.01" placeholder="Ej: 120000" />
-            </div>
-            <div>
-              <label class="label" for="installmentDownPayment">Anticipo</label>
-              <input id="installmentDownPayment" class="input" type="number" min="0" step="0.01" value="0" />
-            </div>
-            <div>
-              <label class="label" for="installmentCount">Cantidad de cuotas</label>
-              <input id="installmentCount" class="input" type="number" min="1" step="1" placeholder="Ej: 12" />
-            </div>
-            <div>
-              <label class="label" for="interestMode">Interés</label>
-              <select id="interestMode" class="input">
-                <option value="none">Sin interés</option>
-                <option value="with_interest">Con interés</option>
-              </select>
-            </div>
-            <div>
-              <label class="label" for="interestRate">Interés / recargo (%)</label>
-              <input id="interestRate" class="input" type="number" min="0" step="0.01" value="0" />
-            </div>
-          </div>
-          <div class="row">
-            <button class="btn primary" id="btn-installments">Calcular</button>
-            <button class="btn" id="btn-installments-clear">Limpiar</button>
-          </div>
-          <div class="result" id="financialInstallmentsResult"></div>
+          <div class="result result-financial" id="financialTipResult"></div>
         </div>
       </section>
       <footer class="app-footer" id="appFooter"></footer>
