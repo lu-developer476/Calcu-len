@@ -12,27 +12,60 @@
 ![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![MIT License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-Calculadora web multi-modo orientada a precisión matemática, experiencia de usuario y despliegue profesional.
+Calculadora web integral orientada a precisión matemática, experiencia de usuario y despliegue profesional.
 
-## Funcionalidades
+---
+
+## 🚀 Funcionalidades
+
 - **Estándar**: operaciones aritméticas y expresiones con paréntesis.
 - **Científica**: trigonometría, logaritmos, exponenciales, funciones hiperbólicas y números complejos.
 - **Gráfica**: trazado de funciones en `x` con múltiples curvas.
 - **Programadora**: conversiones de base y operaciones bitwise.
 - **Fechas**: diferencia, suma y resta de días.
+- **Financiera**:
+  - Propinas y descuentos por porcentaje
+  - Cálculo de cuotas con y sin interés
+  - Anticipo configurable
+  - Resultado detallado (financiado, total, cuota)
 
-## Stack técnico
+---
+
+## 🏗️ Stack técnico
+
 - **Frontend:** HTML + CSS + JavaScript (sin frameworks)
 - **Backend:** FastAPI (`api/index.py`)
 - **Deploy:** Vercel (función Python + estáticos)
 
-## Seguridad
-La app **no utiliza `eval()` en backend**. Las expresiones se resuelven con parser AST seguro y allowlist de:
+---
+
+## 🧠 Arquitectura
+
+- Sistema de navegación por modos (tabs dinámicos)
+- Paneles independientes por funcionalidad
+- Comunicación frontend-backend vía `/api/calculate`
+- Fallback local en caso de fallo de API
+- Separación clara entre UI, lógica y validación
+
+---
+
+## 🔐 Seguridad
+
+La app **no utiliza `eval()` en backend**.
+
+Las expresiones se procesan mediante:
+- Parser AST seguro
+- Allowlist controlada
+
+Incluye:
+
 - Operadores: `+ - * / // % **`
 - Constantes: `pi`, `e`, `tau`, `i`
-- Funciones matemáticas habilitadas
+- Funciones matemáticas validadas
 
-## Ejecución local
+---
+
+## ⚙️ Ejecución local
 
 ### 1) Entorno e instalación
 ```bash
@@ -49,13 +82,18 @@ uvicorn api.index:app --reload
 ### 3) Servir frontend
 Abrí `public/index.html` con Live Server o cualquier servidor estático.
 
-## Endpoints
+---
+
+## 📡 Endpoints
+
 - `GET /api/health`
 - `POST /api/calculate`
 - `POST /api/graph`
 - `POST /api/angle-mode`
 
-## Ejemplos de cálculos para probar
+---
+
+## 🧪 Ejemplos de cálculos
 
 ### Estándar
 - `4 + 2,5` → `6,50000`
@@ -65,27 +103,66 @@ Abrí `public/index.html` con Live Server o cualquier servidor estático.
 ### Científica
 - `sin(pi/2)` en `RAD` → `1,00000`
 - `sin(45)` en `DEG`
-- `√(125^2 - 5^4) + log(1000) + sin(45) × 20`
 - `ln(e^2)`
 
 ### Gráfica
 - `sin(x), x^2/10`
 - `tan(x)` con `x_min=-10`, `x_max=10`, `samples=400`
-- `sqrt(x)` con `x_min=0`, `x_max=25`, `samples=200`
 
 ### Programadora
-- Número decimal `42` a base `2`, `8`, `16`
-- `bit_and` entre `42` y `7`
-- `shl` de `5` por `2`
+- Decimal `42` → binario / octal / hexadecimal
+- `bit_and(42, 7)`
+- `shl(5, 2)`
 
 ### Fechas
-- Diferencia entre `2026-01-01` y `2026-12-31`
-- Sumar `30` días a una fecha
-- Restar `90` días a una fecha
+- Diferencia entre fechas
+- Sumar/restar días
 
-## Notas de UX
-- Se acepta `^` como potencia desde el frontend (se normaliza a `**`).
-- Se aceptan `^`, `√`, `×`, `÷`, `π` y `−`; se normalizan automáticamente para cálculo científico.
-- La gráfica descarta valores no finitos para evitar errores de render y JSON inválido.
-- Se muestran estados de carga y feedback de error en cada flujo principal.
-- Modo científico en **grados (DEG)** por defecto; podés cambiar a RAD vía `POST /api/angle-mode`.
+### Financiera
+
+#### Propinas / Descuentos
+- $1000 con 10% → $1100 (propina)
+- $2000 con 25% → $1500 (descuento)
+
+#### Cuotas
+- Precio: $100000
+- Anticipo: $20000
+- Cuotas: 6
+- Interés: 20%
+
+Resultado:
+- Financiado: $80000
+- Total: $96000
+- Cuota: $16000
+
+---
+
+## 🎯 Notas de UX
+
+- Se acepta `^` como potencia (se convierte a `**`)
+- Soporte de símbolos: `√ × ÷ π −`
+- Normalización automática de inputs
+- Manejo de errores y feedback visual
+- Estados de carga
+- Modo científico en DEG por defecto (configurable a RAD)
+
+---
+
+## 🧪 Testing
+
+- Pytest + HTTPX
+- Validación de endpoints principales
+- Cobertura de cálculos críticos
+- Tests para modo financiero incluidos
+
+---
+
+## 📌 Roadmap
+
+- Historial de cálculos
+- Persistencia en localStorage
+- Exportación de resultados
+- Modo oscuro
+- Finanzas avanzadas (interés compuesto)
+
+---
