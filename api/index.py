@@ -310,6 +310,9 @@ class CalcRequest(BaseModel):
         if self.mode != "financial":
             return self
 
+        if self.financial_op is None:
+            raise ValueError("Falta financial_op")
+
         if self.financial_op == "tip_discount":
             if self.amount is None:
                 raise ValueError("Falta amount")

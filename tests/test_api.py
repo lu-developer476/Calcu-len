@@ -246,3 +246,47 @@ def test_financial_installments_rejects_invalid_installments():
 
     assert response.status_code == 200
     assert response.json()["error"] == "La cantidad de cuotas debe ser mayor a 0"
+
+
+def test_financial_requires_financial_op():
+    response = client.post(
+        "/api/calculate",
+        json={
+            "mode": "financial",
+            "amount": 1000,
+            "percentage": 10,
+            "calculation_type": "tip",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_date_mode_still_works_for_diff():
+    response = client.post(
+        "/api/calculate",
+        json={
+            "mode": "date",
+            "date_op": "diff",
+            "date1": "2026-01-10",
+            "date2": "2026-01-15",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"] == 5
+
+
+def test_programmer_mode_still_converts_bases():
+    response = client.post(
+        "/api/calculate",
+        json={
+            "mode": "programmer",
+            "op": "to_base",
+            "number": 42,
+            "base": 16,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["result"] == "0x2a"

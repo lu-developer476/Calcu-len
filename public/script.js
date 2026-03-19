@@ -293,6 +293,7 @@ async function setApiAngleMode(mode) {
 
   const candidates = [
     `/api/angle-mode?mode=${encodeURIComponent(normalized)}`,
+    `/api/vercel_app.py/angle-mode?mode=${encodeURIComponent(normalized)}`,
     `/api/index.py/angle-mode?mode=${encodeURIComponent(normalized)}`,
   ];
 
@@ -449,10 +450,10 @@ function localFallbackTipDiscount(amount, percentage, calculationType) {
   }
 
   const normalizedType = calculationType === "discount" ? "discount" : "tip";
-  const calculatedAmount = amount * (percentage / 100);
-  const total = normalizedType === "discount"
+  const calculatedAmount = Number((amount * (percentage / 100)).toFixed(2));
+  const total = Number((normalizedType === "discount"
     ? amount - calculatedAmount
-    : amount + calculatedAmount;
+    : amount + calculatedAmount).toFixed(2));
 
   const resultData = {
     base_amount: amount,
@@ -490,12 +491,12 @@ function localFallbackInstallments(price, downPayment, installments, interestMod
   }
 
   const normalizedMode = interestMode === "with_interest" ? "with_interest" : "none";
-  const financedAmount = price - downPayment;
-  const surchargeAmount = normalizedMode === "with_interest"
+  const financedAmount = Number((price - downPayment).toFixed(2));
+  const surchargeAmount = Number((normalizedMode === "with_interest"
     ? financedAmount * (interestRate / 100)
-    : 0;
-  const totalFinanced = financedAmount + surchargeAmount;
-  const installmentValue = totalFinanced / installments;
+    : 0).toFixed(2));
+  const totalFinanced = Number((financedAmount + surchargeAmount).toFixed(2));
+  const installmentValue = Number((totalFinanced / installments).toFixed(2));
 
   const resultData = {
     base_price: price,
@@ -626,7 +627,11 @@ async function calculateExpression() {
 
   try {
     if (currentMode === "scientific") {
-      await setApiAngleMode($("angleMode")?.value || currentAngleMode);
+      try {
+        await setApiAngleMode($("angleMode")?.value || currentAngleMode);
+      } catch {
+        currentAngleMode = $("angleMode")?.value || currentAngleMode;
+      }
     }
 
     const data = await postJSON("/api/calculate", {
